@@ -1,0 +1,173 @@
+@st-import [headingFont, monoFont, pageBg, panelBg, panelBorder, uiFgColor, uiMutedColor, accentColor] from "../project.st.css";
+
+.root {
+    width: min(72rem, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: clamp(4rem, 10vw, 8rem) 0 3rem;
+}
+
+.hero {
+    position: relative;
+    max-width: 54rem;
+    padding-bottom: clamp(4rem, 8vw, 7rem);
+}
+
+.hero::after {
+    position: absolute;
+    z-index: -1;
+    top: -10rem;
+    left: -12rem;
+    width: 34rem;
+    height: 34rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, value(accentColor) 14%, transparent);
+    filter: blur(7rem);
+    content: "";
+}
+
+.eyebrow {
+    -st-mixin: monoFont;
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: value(accentColor);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.title {
+    -st-mixin: headingFont;
+    margin: 0;
+    color: value(uiFgColor);
+    font-size: clamp(3.5rem, 10vw, 7.5rem);
+    line-height: 0.92;
+    letter-spacing: -0.055em;
+}
+
+.intro {
+    max-width: 42rem;
+    margin: 2rem 0 0;
+    color: value(uiMutedColor);
+    font-size: clamp(1.05rem, 2vw, 1.25rem);
+    line-height: 1.7;
+}
+
+.code {
+    -st-mixin: monoFont;
+    display: inline-block;
+    margin: 0 0.35em;
+    color: value(uiFgColor);
+    font-size: 0.85em;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2rem;
+}
+
+.primaryAction,
+.secondaryAction {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0 1.25rem;
+    border: 1px solid value(panelBorder);
+    border-radius: 999px;
+    font-weight: 650;
+    text-decoration: none;
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.primaryAction {
+    border-color: value(accentColor);
+    color: value(pageBg);
+    background: value(accentColor);
+}
+
+.secondaryAction {
+    background: color-mix(in srgb, value(panelBg) 88%, transparent);
+}
+
+.primaryAction:hover,
+.secondaryAction:hover {
+    transform: translateY(-2px);
+}
+
+.secondaryAction:hover {
+    border-color: value(uiMutedColor);
+}
+
+.primaryAction:focus-visible,
+.secondaryAction:focus-visible {
+    outline: 3px solid color-mix(in srgb, value(accentColor) 45%, transparent);
+    outline-offset: 3px;
+}
+
+.features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid value(panelBorder);
+    border-radius: 1rem;
+    overflow: hidden;
+    background: value(panelBg);
+}
+
+.card {
+    min-height: 15rem;
+    padding: 1.5rem;
+}
+
+.card + .card {
+    border-left: 1px solid value(panelBorder);
+}
+
+.cardIndex {
+    -st-mixin: monoFont;
+    color: value(accentColor);
+    font-size: 0.75rem;
+}
+
+.cardTitle {
+    margin: 4rem 0 0.75rem;
+    font-size: 1.2rem;
+}
+
+.cardCopy {
+    margin: 0;
+    color: value(uiMutedColor);
+    line-height: 1.6;
+}
+
+@media (max-width: 45rem) {
+    .root {
+        width: min(100% - 1.25rem, 35rem);
+        padding-top: 4rem;
+    }
+
+    .features {
+        grid-template-columns: 1fr;
+    }
+
+    .card {
+        min-height: auto;
+    }
+
+    .card + .card {
+        border-top: 1px solid value(panelBorder);
+        border-left: 0;
+    }
+
+    .cardTitle {
+        margin-top: 2rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .primaryAction,
+    .secondaryAction {
+        transition: none;
+    }
+}

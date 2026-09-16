@@ -1,0 +1,56 @@
+:vars {
+
+    pageBg: #10131a;
+    panelBg: #171b25;
+    panelBorder: #2b3140;
+    uiFgColor: #f5f7fb;
+    uiMutedColor: #aab2c2;
+    accentColor: #b6f36b;
+
+    spacing: st-map(
+        xxs 0.125rem,
+        xs  0.25rem,
+        sm  0.5rem,
+        smd 0.75rem,
+        md  1rem,
+        mlg 1.5rem,
+        lg  2rem,
+        xl  3rem
+    );
+
+    borderRadius: st-map(
+        sm  2px,
+        md  value(spacing, xs),
+        lg  value(spacing, sm)
+    );
+
+    fontBody: Assistant,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    fontUi: Assistant, sans-serif;
+    fontHeading: "Libre Baskerville", sans-serif;
+    fontMono: "Source Code Pro", monospace;
+}
+
+.bodyFont {
+    font-family: value(fontBody);
+    font-weight: 300;
+    font-style: normal;
+    text-transform: none;
+}
+
+.headingFont {
+    font-family: value(fontHeading);
+    font-weight: 500;
+    font-style: normal;
+}
+
+.subheadFont {
+    font-family: value(fontHeading);
+    font-weight: 500;
+    font-style: normal;
+}
+
+.monoFont {
+    font-family: value(fontMono);
+    font-weight: 500;
+    font-style: normal;
+}

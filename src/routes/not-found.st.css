@@ -1,0 +1,30 @@
+@st-import [headingFont, monoFont, uiMutedColor, accentColor] from "../project.st.css";
+
+.root {
+    display: grid;
+    min-height: 100vh;
+    place-content: center;
+    padding: 2rem;
+    text-align: center;
+}
+
+.status {
+    -st-mixin: monoFont;
+    margin: 0;
+    color: value(accentColor);
+}
+
+.title {
+    -st-mixin: headingFont;
+    margin: 1rem 0 2rem;
+    font-size: clamp(2rem, 8vw, 4rem);
+}
+
+.link {
+    color: value(uiMutedColor);
+    text-underline-offset: 0.3em;
+}
+
+.link:hover {
+    color: value(accentColor);
+}

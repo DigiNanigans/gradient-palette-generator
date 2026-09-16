@@ -1,0 +1,29 @@
+{
+  "name": "grad-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Preact and Stylable starter application.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "styles:types": "stc --srcDir ./src --outDir ./st-types --dts --dtsSourceMap",
+    "typecheck": "pnpm run styles:types && tsc --noEmit",
+    "build": "pnpm run typecheck && vite build",
+    "preview": "vite preview"
+  },
+  "packageManager": "pnpm@9.15.2",
+  "devDependencies": {
+    "@base-ui-components/react": "1.0.0-rc.0",
+    "@file-services/node": "^9.4.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@preact/signals": "^2.11.2",
+    "@stylable/cli": "^6.1.1",
+    "@stylable/core": "^6.1.1",
+    "@stylable/optimizer": "^6.1.1",
+    "@stylable/runtime": "^6.1.1",
+    "preact": "^10.29.8",
+    "preact-iso": "^2.12.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
