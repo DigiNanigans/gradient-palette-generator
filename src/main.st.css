@@ -1,4 +1,4 @@
-@st-import [bodyFont, pageBg, uiFgColor] from "./project.st.css";
+@st-import [bodyFont, pageBg, uiFgColor, accentColor] from "./project.st.css";
 
 @font-face {
     font-family: 'Assistant';
@@ -46,4 +46,9 @@
 
 :global([hidden]) {
     display: none !important;
+}
+
+:focus-visible {
+    outline: 3px solid color-mix(in srgb, value(accentColor) 45%, transparent);
+    outline-offset: 2px;
 }

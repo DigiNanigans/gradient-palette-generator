@@ -1,0 +1,18 @@
+.root {
+    display: grid;
+    grid-template-columns: 16rem 1fr;
+    gap: 2.5rem 3rem;
+    padding: 1.5rem 0;
+}
+
+.col {
+    display: flex;
+    flex-direction: column;
+    gap: inherit;
+}
+
+@media (max-width: 42rem) {
+    .root {
+        grid-template-columns: 1fr;
+    }
+}

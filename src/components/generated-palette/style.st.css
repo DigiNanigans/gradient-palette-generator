@@ -1,0 +1,18 @@
+@st-import [panelBg, panelBorder, uiFgColor, accentColor] from "../../project.st.css";
+
+.preview {
+    height: clamp(10rem, 23vw, 20rem);
+    margin-bottom: 1rem;
+    border: 1px solid color-mix(in srgb, value(uiFgColor) 16%, transparent);
+    border-radius: 1rem;
+}
+
+.swatchGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.55rem;
+}
+
+@media (max-width: 42rem) {
+    .swatchGrid { grid-template-columns: 1fr; }
+}

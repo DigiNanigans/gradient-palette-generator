@@ -1,0 +1,20 @@
+@st-import [headingFont, monoFont, panelBorder, uiMutedColor, accentColor] from "../../project.st.css";
+
+.root {
+    padding: 2rem 0 2.5rem;
+    border-bottom: 1px solid value(panelBorder);
+}
+
+.title {
+    -st-mixin: headingFont;
+    margin: 0;
+    font-size: clamp(2.5rem, 7vw, 4rem);
+    line-height: 0.95;
+    letter-spacing: -0.055em;
+}
+
+@media (max-width: 42rem) {
+    .root {
+        padding-bottom: 2rem;
+    }
+}

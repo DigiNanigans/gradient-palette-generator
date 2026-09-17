@@ -4,6 +4,7 @@
     panelBg: #171b25;
     panelBorder: #2b3140;
     uiFgColor: #f5f7fb;
+    uiFgDark: #10131a;
     uiMutedColor: #aab2c2;
     accentColor: #b6f36b;
 
@@ -20,8 +21,8 @@
 
     borderRadius: st-map(
         sm  2px,
-        md  value(spacing, xs),
-        lg  value(spacing, sm)
+        md  0.25rem,
+        lg  0.5rem
     );
 
     fontBody: Assistant,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -53,4 +54,19 @@
     font-family: value(fontMono);
     font-weight: 500;
     font-style: normal;
+}
+
+.heading {
+    margin: 0;
+    font-size: clamp(1.65rem, 3vw, 2.25rem);
+    letter-spacing: -0.035em;
+}
+
+.fieldLabel {
+    -st-mixin: monoFont;
+
+    color: value(uiMutedColor);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }

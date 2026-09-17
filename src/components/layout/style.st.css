@@ -1,3 +1,13 @@
 .root {
     min-height: 100vh;
+    width: min(90rem, calc(100% - 3rem));
+    margin: 0 auto;
+    padding: 3rem 0 6rem;
+}
+
+@media (max-width: 42rem) {
+    .root {
+        width: min(100% - 1.25rem, 35rem);
+        padding-top: 1rem;
+    }
 }

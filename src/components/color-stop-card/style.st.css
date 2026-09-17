@@ -1,0 +1,109 @@
+@st-import [monoFont, pageBg, panelBg, panelBorder, uiFgColor, uiFgDark, uiMutedColor, accentColor, fontMono, borderRadius] from "../../project.st.css";
+
+.root {
+    min-width: 0;
+    padding: 0.6rem;
+    border: 1px solid value(panelBorder);
+    border-radius: value(borderRadius, md);
+    background: value(panelBg);
+}
+
+.colorWell {
+    display: block;
+    height: 8.5rem;
+    border-radius: value(borderRadius, sm);
+    overflow: hidden;
+    background: var(--stopColor);
+    cursor: pointer;
+    position: relative;
+}
+
+.picker {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.hexField {
+    -st-states: invalid, mode(enum(light, dark));
+
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    z-index: 1;
+
+    & input {
+        width: 6.4rem;
+        padding: 0.25rem 0.45rem;
+        border: 1px solid transparent;
+        border-radius: 0.3rem;
+        color: inherit;
+        background: transparent;
+        font-family: value(fontMono);
+        font-size: 1rem;
+        font-weight: bold;
+        text-align: right;
+        text-transform: uppercase;
+        cursor: text;
+        transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    &:mode(light) {
+        color: value(uiFgColor);
+    }
+
+    &:mode(dark) {
+        color: value(uiFgDark);
+    }
+
+    & input:hover {
+        border-color: color-mix(in srgb, currentColor 38%, transparent);
+        background: color-mix(in srgb, currentColor 10%, transparent);
+    }
+
+    & input:focus {
+        border-color: color-mix(in srgb, currentColor 58%, transparent);
+        outline: none;
+        background: color-mix(in srgb, currentColor 14%, transparent);
+    }
+
+    & input:focus-visible {
+        box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 28%, transparent);
+    }
+
+    &:invalid input {
+        border-color: #ff6b6b;
+        background: color-mix(in srgb, #ff6b6b 14%, transparent);
+    }
+
+}
+
+.actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.25rem;
+    padding-top: 0.5rem;
+
+    & button {
+        height: 2rem;
+        border: 0;
+        border-radius: value(borderRadius, sm);
+        color: value(uiMutedColor);
+        background: transparent;
+        cursor: pointer;
+    }
+
+    & button:hover:not(:disabled) {
+        color: value(uiFgColor);
+        background: color-mix(in srgb, value(panelBorder) 65%, transparent);
+    }
+
+    & button:disabled {
+        cursor: not-allowed;
+        opacity: 0.25;
+    }
+
+}

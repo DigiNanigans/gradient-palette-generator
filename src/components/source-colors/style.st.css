@@ -1,0 +1,38 @@
+@st-import [panelBg, panelBorder, uiFgColor, accentColor, borderRadius] from "../../project.st.css";
+
+.addButton {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 1.1rem;
+    border: 1px solid value(panelBorder);
+    border-radius: value(borderRadius, md);
+    color: value(uiFgColor);
+    background: value(panelBg);
+    cursor: pointer;
+    font-weight: 600;
+    grid-column: 1 / -1;
+
+    &:hover {
+        border-color: value(accentColor);
+    }
+
+    & span {
+        display: inline-flex;
+        align-items: center;
+        position: relative;
+    }
+
+    & span::before {
+        content: "＋";
+        position: absolute;
+        right: 100%;
+        margin-right: 0.35rem;
+        color: value(accentColor);
+    }
+}
+
+.stopList {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.75rem;
+}

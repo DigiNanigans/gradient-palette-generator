@@ -21,9 +21,13 @@
     "@stylable/core": "^6.1.1",
     "@stylable/optimizer": "^6.1.1",
     "@stylable/runtime": "^6.1.1",
+    "@types/node": "^22.20.3",
     "preact": "^10.29.8",
     "preact-iso": "^2.12.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "colorjs.io": "^0.7.1"
   }
 }

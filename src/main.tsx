@@ -3,7 +3,6 @@ import { ErrorBoundary, LocationProvider, Route, Router } from "preact-iso";
 import "./main.st.css";
 import "./project.st.css";
 import Home from "~/routes/index";
-import NotFound from "~/routes/not-found";
 import Layout from "~/components/layout";
 
 type ClassType = Signalish<string | undefined>
@@ -43,8 +42,8 @@ const App = () => {
                 <ErrorBoundary>
                     <Router>
 
+                        {/* @ts-ignore */}
                         <Route path="/" component={Home} />
-                        <Route default component={NotFound} />
 
                     </Router>
                 </ErrorBoundary>

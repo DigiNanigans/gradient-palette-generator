@@ -3,7 +3,7 @@ import { nodeFs as fs } from '@file-services/node';
 import { Stylable, generateStylableJSModuleSource } from '@stylable/core';
 import { StylableOptimizer } from '@stylable/optimizer';
 import { buildStylable } from '@stylable/cli';
-import { join, relative, resolve } from 'path';
+import { dirname, join, relative, resolve } from 'path';
 
 const ST_CSS_EXT = '.st.css';
 const ST_VIRTUAL_PREFIX = '\0virtual:stylable:';
@@ -31,6 +31,7 @@ export default function (
 ): VitePlugin {
 
     let stylable: Stylable;
+    let isDevelopment = false;
     let stBuildProcess: Awaited<ReturnType<typeof buildStylable> | undefined>;
 
     const cssMap = new Map<string, string>();
@@ -40,6 +41,17 @@ export default function (
 
     const normalizeId = (id: string) => id.replaceAll(/\\/g, '/');
     const stripQueryParams = (id: string) => id.split('?')[0];
+
+    const createStylable = () => new Stylable({
+        fileSystem: fs,
+        optimizer: new StylableOptimizer(),
+        projectRoot: process.cwd(),
+        mode: isDevelopment ? 'development' : 'production',
+        resolveNamespace(namespace, origin) {
+            const relativePath = normalizeId(relative(process.cwd(), origin));
+            return `${namespace}-${cyrb53(relativePath)}`;
+        },
+    });
 
     const createVirtualIds = (realPath: string) => {
         const normalizedPath = normalizeId(realPath);
@@ -66,26 +78,8 @@ export default function (
         enforce: 'pre',
 
         configResolved(config) {
-
-            const isDev = config.command === 'serve';
-
-            stylable = new Stylable({
-                fileSystem: fs,
-                optimizer: new StylableOptimizer(),
-                projectRoot: process.cwd(),
-                mode: isDev ? "development" : "production",
-                resolveNamespace(namespace, origin, source) {
-                    const relativePath = relative(stylable.projectRoot, origin);
-                    const lastModified = fs.statSync(origin).mtime;
-                    const hash = cyrb53(relativePath + lastModified);
-                    const id = `${namespace}-${hash}`;
-
-                    // console.log({namespace, origin, source, hash, id});
-
-                    return id;
-                },
-            });
-
+            isDevelopment = config.command === 'serve';
+            stylable = createStylable();
         },
 
         resolveId(id, importer) {
@@ -96,8 +90,10 @@ export default function (
 
             if (cleanId.endsWith(ST_CSS_EXT)) {
                 const realPath = importer
-                    ? resolve(importer ? resolve(importer, '..') : '', cleanId)
-                    : resolve(cleanId);
+                    ? resolve(dirname(stripQueryParams(importer)), cleanId)
+                    : cleanId.startsWith('/')
+                        ? resolve(process.cwd(), `.${cleanId}`)
+                        : resolve(cleanId);
 
                 const normalizedRealPath = normalizeId(realPath);
                 const { virtualJsId } = createVirtualIds(normalizedRealPath);
@@ -157,44 +153,39 @@ export default function (
 
         },
 
-        handleHotUpdate({ file, server, modules }: HmrContext) {
+        handleHotUpdate({ file, server }: HmrContext) {
 
             if (!file.endsWith(ST_CSS_EXT)) return;
 
-            const normalizedFile = normalizeId(file);
-            const { virtualJsId, virtualCssId } = createVirtualIds(normalizedFile);
-
-            const result = transformStylesheet(file);
-            cssMap.set(virtualCssId, result.css);
+            stylable = createStylable();
 
             const affectedModules = new Set<ModuleNode>();
 
-            const jsModule = server.moduleGraph.getModuleById(virtualJsId);
-            if (jsModule) {
-                server.moduleGraph.invalidateModule(jsModule);
-                affectedModules.add(jsModule);
+            for (const [virtualJsId, realPath] of stylableFileMap) {
+                const { virtualCssId } = createVirtualIds(realPath);
+                const result = transformStylesheet(realPath);
+                cssMap.set(virtualCssId, result.css);
 
-                // Add importers to affected modules
-                const importers = moduleToImportersMap.get(virtualJsId);
-                if (importers) {
-                    importers.forEach(importer => {
-                        const importerMod = server.moduleGraph.getModuleById(importer);
-                        if (importerMod) {
-                            server.moduleGraph.invalidateModule(importerMod);
-                            affectedModules.add(importerMod);
-                        }
-                    });
+                const jsModule = server.moduleGraph.getModuleById(virtualJsId);
+                if (jsModule) {
+                    server.moduleGraph.invalidateModule(jsModule);
+                    affectedModules.add(jsModule);
                 }
-            }
 
-            const cssModule = server.moduleGraph.getModuleById(virtualCssId);
-            if (cssModule) {
-                server.moduleGraph.invalidateModule(cssModule);
-                affectedModules.add(cssModule);
-            }
+                const cssModule = server.moduleGraph.getModuleById(virtualCssId);
+                if (cssModule) {
+                    server.moduleGraph.invalidateModule(cssModule);
+                    affectedModules.add(cssModule);
+                }
 
-            if (affectedModules.size === 0) {
-                return modules;
+                const importers = moduleToImportersMap.get(virtualJsId);
+                importers?.forEach((importer) => {
+                    const importerModule = server.moduleGraph.getModuleById(importer);
+                    if (importerModule) {
+                        server.moduleGraph.invalidateModule(importerModule);
+                        affectedModules.add(importerModule);
+                    }
+                });
             }
 
             return Array.from(affectedModules);

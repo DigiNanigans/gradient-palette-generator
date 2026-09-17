@@ -1,0 +1,88 @@
+@st-import [monoFont, pageBg, panelBg, panelBorder, uiFgColor, uiMutedColor, accentColor, fieldLabel, heading, borderRadius, spacing] from "../../project.st.css";
+
+.card {
+    display: flex;
+    gap: 2rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid value(panelBorder);
+    border-radius: value(borderRadius, md);
+    background: value(panelBg);
+
+    & > * {
+        flex: 1;
+    }
+}
+
+.control {
+    display: grid;
+    gap: 0.75rem;
+
+    & select {
+        width: 100%;
+        height: 2.5rem;
+        padding: 0 2.25rem 0 0.8rem;
+        border: 1px solid value(panelBorder);
+        border-radius: value(borderRadius, md);
+        color: value(uiFgColor);
+        background: value(pageBg);
+    }
+}
+
+.label {
+    -st-extends: fieldLabel;
+
+    display: flex;
+    justify-content: space-between;
+
+    & strong {
+        color: value(accentColor);
+    }
+
+    .control:has(select) & {
+        padding-inline: 0.25rem;
+    }
+}
+
+.range {
+    width: 100%;
+    height: 0.35rem;
+    margin: 0.55rem 0 0;
+    border-radius: 999px;
+    appearance: none;
+    background: linear-gradient(90deg, value(accentColor) var(--rangeProgress), value(panelBorder) var(--rangeProgress));
+
+    &::-webkit-slider-thumb {
+        width: 1.15rem;
+        height: 1.15rem;
+        border: 3px solid value(pageBg);
+        border-radius: 50%;
+        appearance: none;
+        background: value(accentColor);
+        box-shadow: 0 0 0 1px value(accentColor);
+        cursor: grab;
+    }
+
+    &::-moz-range-thumb {
+        width: 0.85rem;
+        height: 0.85rem;
+        border: 3px solid value(pageBg);
+        border-radius: 50%;
+        background: value(accentColor);
+        box-shadow: 0 0 0 1px value(accentColor);
+        cursor: grab;
+    }
+}
+
+.rangeBounds {
+    display: flex;
+    justify-content: space-between;
+    color: value(uiMutedColor);
+    font-size: 0.75rem;
+}
+
+@media (max-width: 58rem) {
+    .card {
+        flex-direction: column;
+        gap: 1.5rem
+    }
+}
