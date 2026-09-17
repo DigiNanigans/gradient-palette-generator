@@ -18,6 +18,39 @@
     flex-basis: 100%;
 }
 
+.easingToggle {
+    -st-states: expanded;
+
+    align-self: end;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 1px solid value(panelBorder);
+    border-radius: value(borderRadius, md);
+    color: value(uiMutedColor);
+    background: value(pageBg);
+    cursor: pointer;
+
+    & svg {
+        width: 1.2rem;
+        height: 1.2rem;
+        overflow: visible;
+        fill: value(pageBg);
+        stroke: currentColor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    &:hover {
+        color: value(accentColor);
+        border-color: value(accentColor);
+    }
+}
+
 .control {
     -st-states: wide;
 

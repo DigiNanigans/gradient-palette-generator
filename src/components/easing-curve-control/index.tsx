@@ -1,4 +1,4 @@
-import type { JSX, TargetedKeyboardEvent, TargetedPointerEvent } from "preact";
+import type { TargetedPointerEvent } from "preact";
 import { useRef } from "preact/hooks";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import { LINEAR_EASING_CURVE, type CubicBezierCurve } from "~/lib/colors";

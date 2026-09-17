@@ -2,7 +2,7 @@ import type { HueMethod, InterpolationSpace } from "~/lib/colors";
 import { classes, st, vars } from "./style.st.css";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import SectionHeading from "../section-heading";
-import { useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 import EasingCurveControl from "../easing-curve-control";
 
 const SPACE_OPTIONS: Array<{ value: InterpolationSpace; label: string }> = [
@@ -19,6 +19,7 @@ const BlendSettings = () => {
 
     const { stepCount, minStepCount, maxStepCount, space, hue, setStepCount, setSpace, setHue } = useGradientGenerator();
     const rangeProgress = useComputed(() => maxStepCount === minStepCount.value ? 100 : ((stepCount.value - minStepCount.value) / (maxStepCount - minStepCount.value)) * 100);
+    const showEasingControls = useSignal(false);
 
     return (
         <section class={classes.root}>
@@ -57,7 +58,18 @@ const BlendSettings = () => {
                     </select>
                 </label>
 
-                <div class={classes.curveRow}>
+                <button type="button" class={st(classes.easingToggle, { expanded: showEasingControls.value })} title={showEasingControls.value ? "Hide easing controls" : "Show easing controls"}
+                    onClick={() => showEasingControls.value = !showEasingControls.value}
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 18c5 0 4-12 10-12s5 12 8 12" />
+                        <circle cx="1" cy="19" r="1.5" />
+                        <circle cx="13" cy="4" r="1.5" />
+                        <circle cx="23" cy="19" r="1.5" />
+                    </svg>
+                </button>
+
+                <div class={classes.curveRow} hidden={!showEasingControls.value}>
                     <EasingCurveControl />
                 </div>
 
