@@ -1,7 +1,7 @@
 import { batch, type ReadonlySignal, useComputed, useSignal } from "@preact/signals";
 import { createContext, type FunctionComponent, h } from "preact";
 import { useContext, useRef } from "preact/hooks";
-import { createPalette, describeColor, type ColorDetails, type HueMethod, type InterpolationSpace } from "~/lib/colors";
+import { createPalette, describeColor, LINEAR_EASING_CURVE, type ColorDetails, type CubicBezierCurve, type HueMethod, type InterpolationSpace } from "~/lib/colors";
 import type { ColorStop } from "~/types/gradient";
 
 const INITIAL_COLORS = ["#F9D976", "#F39F86"];
@@ -19,11 +19,13 @@ type GradientGenContextValue = {
     canAddStop: ReadonlySignal<boolean>;
     space: ReadonlySignal<InterpolationSpace>;
     hue: ReadonlySignal<HueMethod>;
+    easing: ReadonlySignal<CubicBezierCurve>;
     colors: ReadonlySignal<ColorDetails[]>;
     preview: ReadonlySignal<string>;
     setStepCount: (value: number) => void;
     setSpace: (value: InterpolationSpace) => void;
     setHue: (value: HueMethod) => void;
+    setEasing: (value: CubicBezierCurve) => void;
     updateStop: (id: number, input: string) => void;
     commitStop: (id: number) => void;
     addStop: () => void;
@@ -40,6 +42,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const requestedStepCount = useSignal(8);
     const space = useSignal<InterpolationSpace>("oklch");
     const hue = useSignal<HueMethod>("shorter");
+    const easing = useSignal<CubicBezierCurve>({ ...LINEAR_EASING_CURVE });
 
     const minStepCount = useComputed(() => stops.value.length);
     const stepCount = useComputed(() => Math.min(
@@ -53,6 +56,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         stepCount.value,
         space.value,
         hue.value,
+        easing.value,
     ).map(describeColor));
 
     const preview = useComputed(() => `linear-gradient(90deg, ${colors.value
@@ -62,6 +66,13 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const setStepCount = (value: number) => requestedStepCount.value = Math.min(MAX_PALETTE_SIZE, Math.max(value, minStepCount.value));
     const setSpace = (value: InterpolationSpace) => space.value = value;
     const setHue = (value: HueMethod) => hue.value = value;
+
+    const setEasing = (value: CubicBezierCurve) => easing.value = {
+        x1: Math.min(1, Math.max(0, value.x1)),
+        y1: Math.min(1, Math.max(0, value.y1)),
+        x2: Math.min(1, Math.max(0, value.x2)),
+        y2: Math.min(1, Math.max(0, value.y2)),
+    };
 
     const updateStop = (id: number, input: string) => {
         const normalized = input.startsWith("#") ? input : `#${input}`;
@@ -113,11 +124,13 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         canAddStop,
         space,
         hue,
+        easing,
         colors,
         preview,
         setStepCount,
         setSpace,
         setHue,
+        setEasing,
         updateStop,
         commitStop,
         addStop,

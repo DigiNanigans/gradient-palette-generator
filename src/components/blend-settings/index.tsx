@@ -3,6 +3,7 @@ import { classes, st, vars } from "./style.st.css";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import SectionHeading from "../section-heading";
 import { useComputed } from "@preact/signals";
+import EasingCurveControl from "../easing-curve-control";
 
 const SPACE_OPTIONS: Array<{ value: InterpolationSpace; label: string }> = [
     { value: "oklch", label: "OKLCH" },
@@ -26,7 +27,7 @@ const BlendSettings = () => {
 
             <div class={classes.card}>
 
-                <label class={st(classes.control)}>
+                <label class={st(classes.control, {wide: true})}>
                     <span class={classes.label}>Steps <strong>{stepCount.value}</strong></span>
                     <input
                         class={classes.range}
@@ -55,6 +56,10 @@ const BlendSettings = () => {
                         <option value="longer">Longer</option>
                     </select>
                 </label>
+
+                <div class={classes.curveRow}>
+                    <EasingCurveControl />
+                </div>
 
             </div>
 

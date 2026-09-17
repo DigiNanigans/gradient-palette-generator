@@ -2,6 +2,7 @@
 
 .card {
     display: flex;
+    flex-wrap: wrap;
     gap: 2rem;
     padding: 1.25rem 1.5rem;
     border: 1px solid value(panelBorder);
@@ -13,7 +14,13 @@
     }
 }
 
+.curveRow {
+    flex-basis: 100%;
+}
+
 .control {
+    -st-states: wide;
+
     display: grid;
     gap: 0.75rem;
 
@@ -84,5 +91,17 @@
     .card {
         flex-direction: column;
         gap: 1.5rem
+    }
+}
+
+@media (max-width: 42rem) {
+    .card {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .control:wide {
+        width: 100%;
+        flex: none;
     }
 }
