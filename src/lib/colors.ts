@@ -74,24 +74,134 @@ export const getContrastMode = (
     return lightContrast >= darkContrast ? "light" : "dark";
 };
 
+type CurvePoint = { x: number; y: number };
+
+const createMonotoneCurve = (points: CurvePoint[]) => {
+    const widths = points.slice(0, -1).map((point, index) => points[index + 1].x - point.x);
+    const slopes = widths.map((width, index) => (points[index + 1].y - points[index].y) / width);
+    const tangents = points.map((_, index) => {
+        if (index === 0) return slopes[0];
+        if (index === points.length - 1) return slopes[slopes.length - 1];
+        return (slopes[index - 1] + slopes[index]) / 2;
+    });
+
+    slopes.forEach((slope, index) => {
+        if (slope === 0) {
+            tangents[index] = 0;
+            tangents[index + 1] = 0;
+            return;
+        }
+
+        const startRatio = tangents[index] / slope;
+        const endRatio = tangents[index + 1] / slope;
+        const magnitude = Math.hypot(startRatio, endRatio);
+
+        if (magnitude > 3) {
+            const scale = 3 / magnitude;
+            tangents[index] = scale * startRatio * slope;
+            tangents[index + 1] = scale * endRatio * slope;
+        }
+    });
+
+    return (value: number) => {
+        const position = clamp(value, 0, 1);
+        const upperIndex = points.findIndex((point) => point.x >= position);
+        if (upperIndex <= 0) return points[0].y;
+
+        const lowerIndex = upperIndex - 1;
+        const width = widths[lowerIndex];
+        const localPosition = width === 0 ? 0 : (position - points[lowerIndex].x) / width;
+        const squared = localPosition * localPosition;
+        const cubed = squared * localPosition;
+        const startBasis = (2 * cubed) - (3 * squared) + 1;
+        const startTangentBasis = cubed - (2 * squared) + localPosition;
+        const endBasis = (-2 * cubed) + (3 * squared);
+        const endTangentBasis = cubed - squared;
+
+        return clamp(
+            (startBasis * points[lowerIndex].y)
+            + (startTangentBasis * width * tangents[lowerIndex])
+            + (endBasis * points[upperIndex].y)
+            + (endTangentBasis * width * tangents[upperIndex]),
+            0,
+            1,
+        );
+    };
+};
+
+export const createGradientPositionMapper = (
+    sourceCount: number,
+    steps: number,
+    easing: CubicBezierCurve,
+    snapToSourceColors = false,
+) => {
+    const rangeCount = Math.max(sourceCount - 1, 1);
+    const getAuthoredPosition = (progress: number) => {
+        const position = clamp(progress, 0, 1) * rangeCount;
+        const rangeIndex = Math.min(Math.floor(position), rangeCount - 1);
+        const localPosition = Math.min(position - rangeIndex, 1);
+        return (rangeIndex + applyCubicBezier(localPosition, easing)) / rangeCount;
+    };
+
+    if (!snapToSourceColors || sourceCount <= 2 || steps < sourceCount) {
+        return getAuthoredPosition;
+    }
+
+    const fitPoints: CurvePoint[] = [{ x: 0, y: 0 }];
+    let previousStep = 0;
+
+    for (let sourceIndex = 1; sourceIndex < sourceCount - 1; sourceIndex += 1) {
+        const expectedPosition = sourceIndex / rangeCount;
+        const lastAvailableStep = steps - sourceCount + sourceIndex;
+        let nearestStep = previousStep + 1;
+        let nearestPosition = getAuthoredPosition(nearestStep / (steps - 1));
+        let nearestDistance = Math.abs(nearestPosition - expectedPosition);
+
+        for (let stepIndex = previousStep + 2; stepIndex <= lastAvailableStep; stepIndex += 1) {
+            const stepPosition = getAuthoredPosition(stepIndex / (steps - 1));
+            const distance = Math.abs(stepPosition - expectedPosition);
+
+            if (distance < nearestDistance) {
+                nearestStep = stepIndex;
+                nearestPosition = stepPosition;
+                nearestDistance = distance;
+            }
+        }
+
+        fitPoints.push({ x: nearestPosition, y: expectedPosition });
+        previousStep = nearestStep;
+    }
+
+    fitPoints.push({ x: 1, y: 1 });
+    const applyBestFit = createMonotoneCurve(fitPoints);
+    return (progress: number) => applyBestFit(getAuthoredPosition(progress));
+};
+
 export const createPalette = (
     sourceColors: string[],
     steps: number,
     space: InterpolationSpace,
     hue: HueMethod,
     easing: CubicBezierCurve = LINEAR_EASING_CURVE,
+    snapToSourceColors = false,
 ) => {
     if (sourceColors.length < 2) return sourceColors.map((color) => new Color(color));
     const ranges = sourceColors.slice(0, -1).map((color, index) => new Color(color).range(
         new Color(sourceColors[index + 1]),
         { space, hue, outputSpace: "srgb" },
     ));
+    const getGradientPosition = createGradientPositionMapper(
+        sourceColors.length,
+        steps,
+        easing,
+        snapToSourceColors,
+    );
 
     return Array.from({ length: steps }, (_, index) => {
-        const position = (index / Math.max(steps - 1, 1)) * ranges.length;
+        const position = getGradientPosition(index / Math.max(steps - 1, 1)) * ranges.length;
         const rangeIndex = Math.min(Math.floor(position), ranges.length - 1);
         const localPosition = Math.min(position - rangeIndex, 1);
-        return ranges[rangeIndex](applyCubicBezier(localPosition, easing)).toGamut("srgb").to("srgb");
+        return ranges[rangeIndex](localPosition).toGamut("srgb").to("srgb");
     });
 };
 

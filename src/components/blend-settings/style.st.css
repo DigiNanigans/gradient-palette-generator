@@ -47,7 +47,11 @@
 
     &:hover {
         color: value(accentColor);
-        border-color: value(accentColor);
+        border-color: value(uiMutedColor);
+    }
+
+    &:expanded {
+        color: value(accentColor);
     }
 }
 

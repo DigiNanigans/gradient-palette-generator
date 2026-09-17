@@ -20,12 +20,14 @@ type GradientGenContextValue = {
     space: ReadonlySignal<InterpolationSpace>;
     hue: ReadonlySignal<HueMethod>;
     easing: ReadonlySignal<CubicBezierCurve>;
+    snapToSourceColors: ReadonlySignal<boolean>;
     colors: ReadonlySignal<ColorDetails[]>;
     preview: ReadonlySignal<string>;
     setStepCount: (value: number) => void;
     setSpace: (value: InterpolationSpace) => void;
     setHue: (value: HueMethod) => void;
     setEasing: (value: CubicBezierCurve) => void;
+    setSnapToSourceColors: (value: boolean) => void;
     updateStop: (id: number, input: string) => void;
     commitStop: (id: number) => void;
     addStop: () => void;
@@ -43,6 +45,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const space = useSignal<InterpolationSpace>("oklch");
     const hue = useSignal<HueMethod>("shorter");
     const easing = useSignal<CubicBezierCurve>({ ...LINEAR_EASING_CURVE });
+    const snapToSourceColors = useSignal(false);
 
     const minStepCount = useComputed(() => stops.value.length);
     const stepCount = useComputed(() => Math.min(
@@ -57,6 +60,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         space.value,
         hue.value,
         easing.value,
+        snapToSourceColors.value,
     ).map(describeColor));
 
     const preview = useComputed(() => `linear-gradient(90deg, ${colors.value
@@ -66,6 +70,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const setStepCount = (value: number) => requestedStepCount.value = Math.min(MAX_PALETTE_SIZE, Math.max(value, minStepCount.value));
     const setSpace = (value: InterpolationSpace) => space.value = value;
     const setHue = (value: HueMethod) => hue.value = value;
+    const setSnapToSourceColors = (value: boolean) => snapToSourceColors.value = value;
 
     const setEasing = (value: CubicBezierCurve) => easing.value = {
         x1: Math.min(1, Math.max(0, value.x1)),
@@ -125,12 +130,14 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         space,
         hue,
         easing,
+        snapToSourceColors,
         colors,
         preview,
         setStepCount,
         setSpace,
         setHue,
         setEasing,
+        setSnapToSourceColors,
         updateStop,
         commitStop,
         addStop,

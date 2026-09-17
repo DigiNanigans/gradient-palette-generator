@@ -2,8 +2,11 @@
 
 .root {
     display: grid;
-    grid-template-columns: [graph] minmax(12rem, 17rem) [label input] minmax(0, 1fr);
-    grid-template-rows: [graph-start label] auto [input] 1fr [graph-end];
+    grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr) auto;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+        "graph label toggle"
+        "graph input input";
     gap: 1.5rem;
     padding-top: 1.5rem;
     border-top: 1px solid value(panelBorder);
@@ -53,6 +56,17 @@
     vector-effect: non-scaling-stroke;
 }
 
+.authoredCurve {
+    fill: none;
+    stroke: value(uiFgColor);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-dasharray: 4 4;
+    opacity: 0.85;
+    pointer-events: none;
+    vector-effect: non-scaling-stroke;
+}
+
 .endpoint {
     fill: value(uiFgColor);
     stroke: value(pageBg);
@@ -87,6 +101,79 @@
 
 .label {
     -st-extends: fieldLabel;
+}
+
+.snapControl {
+    -st-states: disabled;
+
+    grid-area: toggle;
+    display: grid;
+    align-content: start;
+    justify-items: end;
+    justify-self: end;
+    gap: 0.25rem;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+}
+
+.snapInput {
+    --width: 3.25rem;
+    --height: 1.75rem;
+    --padding: 0.2rem;
+
+    position: relative;
+    width: var(--width);
+    height: var(--height);
+    margin: 0.5rem 0;
+    border: 1px solid value(panelBorder);
+    border-radius: value(borderRadius, md);
+    appearance: none;
+    background: value(pageBg);
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+
+    &::after {
+        content: "";
+        position: absolute;
+        top: var(--padding);
+        left: var(--padding);
+        width: calc((100% - (var(--padding) * 3)) / 2);
+        height: calc(100% - (var(--padding) * 2));
+        border-radius: value(borderRadius, sm);
+        background: value(uiMutedColor);
+        transition: transform 140ms ease, background-color 140ms ease;
+    }
+
+    &:checked::after {
+        transform: translateX(calc(100% + var(--padding)));
+        background: value(accentColor);
+    }
+
+    &:hover {
+        border-color: value(uiMutedColor);
+    }
+
+    &:hover::after {
+        background: value(accentColor);
+    }
+
+    &:focus-visible {
+        outline: 2px solid value(accentColor);
+        outline-offset: 2px;
+    }
+
+    &:disabled {
+        border-color: value(panelBorder);
+        cursor: not-allowed;
+    }
+
+    &:disabled::after {
+        background: value(uiMutedColor);
+    }
 }
 
 .description {
@@ -185,8 +272,12 @@
 
 @media (max-width: 64rem) {
     .root {
-        grid-template-columns: [label graph input] 1fr;
-        grid-template-rows: [label] auto [graph] auto [input] auto;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto auto;
+        grid-template-areas:
+            "label toggle"
+            "graph graph"
+            "input input";
     }
 
     .graphPanel {
