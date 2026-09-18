@@ -1,0 +1,46 @@
+@st-import [panelBg, panelBorder, uiFgColor, uiMutedColor, fieldLabel, fontMono, borderRadius] from "../../project.st.css";
+
+.root {
+    display: grid;
+    gap: 0.65rem;
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.35rem;
+    border: 1px solid value(panelBorder);
+    border-radius: value(borderRadius, md);
+    color: value(uiFgColor);
+    background: value(panelBg);
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+        border-color: value(uiMutedColor);
+    }
+}
+
+.preview {
+    display: block;
+    width: 100%;
+    height: clamp(5rem, 10vw, 8rem);
+    border-radius: value(borderRadius, sm);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.details {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0 0.25rem 0.2rem;
+}
+
+.label {
+    -st-extends: fieldLabel;
+}
+
+.dimensions {
+    color: value(uiMutedColor);
+    font-family: value(fontMono);
+    font-size: 0.72rem;
+}
