@@ -1,5 +1,5 @@
 import { render, options, Signalish } from "preact";
-import { ErrorBoundary, LocationProvider, Route, Router } from "preact-iso";
+import { ErrorBoundary } from "preact-iso";
 import "./main.st.css";
 import "./project.st.css";
 import Home from "~/routes/index";
@@ -38,16 +38,9 @@ const App = () => {
     return (
         <Layout>
 
-            <LocationProvider>
-                <ErrorBoundary>
-                    <Router>
-
-                        {/* @ts-ignore */}
-                        <Route path="/" component={Home} />
-
-                    </Router>
-                </ErrorBoundary>
-            </LocationProvider>
+            <ErrorBoundary>
+                <Home />
+            </ErrorBoundary>
 
         </Layout>
     );

@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from "node:url";
 import stylable from "./vite-plugins/stylable.ts";
 
 export default defineConfig({
+    base: process.env.BASE_PATH ?? "/",
     plugins: [preact(), stylable({ dtsDir: "./st-types" })],
     resolve: {
         alias: {
