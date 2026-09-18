@@ -3,7 +3,7 @@ import { createContext, type ComponentChildren } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import ToastNotification from "~/components/toast-notification";
 
-export type ToastTone = "neutral" | "success" | "error";
+export type ToastTone = "neutral" | "success" | "warning" | "error";
 
 export type ToastOptions = {
     duration?: number;

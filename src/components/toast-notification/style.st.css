@@ -1,7 +1,7 @@
 @st-import [pageBg, panelBg, panelBorder, uiFgColor, accentColor] from "../../project.st.css";
 
 .root {
-    -st-states: tone(enum(neutral, error, success));
+    -st-states: tone(enum(neutral, error, success, warning));
 
     position: fixed;
     z-index: 10;
@@ -25,6 +25,10 @@
 
     &:tone(error) {
         border-color: #ff6b6b;
+    }
+
+    &:tone(warning) {
+        border-color: #f3c969;
     }
 }
 

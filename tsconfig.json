@@ -3,6 +3,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["node"],
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
@@ -15,6 +16,7 @@
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
@@ -25,5 +27,5 @@
     },
     "rootDirs": ["./src/", "./st-types/"]
   },
-  "include": ["src", "st-types"]
+  "include": ["src", "st-types", "tests"]
 }

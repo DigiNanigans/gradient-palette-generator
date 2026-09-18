@@ -1,13 +1,12 @@
-import { batch, type ReadonlySignal, useComputed, useSignal } from "@preact/signals";
+import { batch, type ReadonlySignal, useComputed, useSignal, useSignalEffect } from "@preact/signals";
 import { createContext, type FunctionComponent, h } from "preact";
-import { useContext, useRef } from "preact/hooks";
-import { createPalette, describeColor, LINEAR_EASING_CURVE, type ColorDetails, type CubicBezierCurve, type HueMethod, type InterpolationSpace } from "~/lib/colors";
+import { useContext, useEffect, useRef } from "preact/hooks";
+import { createPalette, describeColor, type ColorDetails, type CubicBezierCurve, type HueMethod, type InterpolationSpace } from "~/lib/colors";
+import { createPaletteChecksum, createPaletteHash, DEFAULT_PALETTE_CONFIGURATION, MAX_PALETTE_SIZE, parsePaletteHash, type PaletteConfiguration } from "~/lib/palette-link";
 import type { ColorStop } from "~/types/gradient";
+import { useToast } from "./use-toast";
 
-const INITIAL_COLORS = ["#F9D976", "#F39F86"];
 const ADDITIONAL_COLORS = ["#8E54E9", "#4776E6", "#24C6DC", "#7ED957", "#FF6B6B", "#FFD166"];
-const MAX_PALETTE_SIZE = 32;
-
 const makeStop = (id: number, color: string): ColorStop => ({ id, color, input: color });
 export const isHexColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
 
@@ -33,19 +32,25 @@ type GradientGenContextValue = {
     addStop: () => void;
     removeStop: (id: number) => void;
     moveStop: (index: number, direction: 1 | -1) => void;
+    getShareUrl: () => string;
 };
 
 const GradientGenContext = createContext<GradientGenContextValue | undefined>(undefined);
 
 export const GradientGenProvider: FunctionComponent = (props) => {
 
-    const nextId = useRef(INITIAL_COLORS.length);
-    const stops = useSignal(INITIAL_COLORS.map((color, id) => makeStop(id, color)));
-    const requestedStepCount = useSignal(8);
-    const space = useSignal<InterpolationSpace>("oklch");
-    const hue = useSignal<HueMethod>("shorter");
-    const easing = useSignal<CubicBezierCurve>({ ...LINEAR_EASING_CURVE });
-    const snapToSourceColors = useSignal(false);
+    const { notify } = useToast();
+    const initialLink = useRef(parsePaletteHash(window.location.hash)).current;
+    const expectedChecksum = useRef(initialLink?.checksum);
+    const initialConfiguration = initialLink ?? DEFAULT_PALETTE_CONFIGURATION;
+    const initialColors = initialConfiguration.colors;
+    const nextId = useRef(initialColors.length);
+    const stops = useSignal(initialColors.map((color, id) => makeStop(id, color)));
+    const requestedStepCount = useSignal(initialConfiguration.stepCount);
+    const space = useSignal<InterpolationSpace>(initialConfiguration.space);
+    const hue = useSignal<HueMethod>(initialConfiguration.hue);
+    const easing = useSignal<CubicBezierCurve>({ ...initialConfiguration.easing });
+    const snapToSourceColors = useSignal(initialConfiguration.snapToSourceColors);
 
     const minStepCount = useComputed(() => stops.value.length);
     const stepCount = useComputed(() => Math.min(
@@ -62,6 +67,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         easing.value,
         snapToSourceColors.value,
     ).map(describeColor));
+    const paletteChecksum = useComputed(() => createPaletteChecksum(colors.value.map(({ hex }) => hex)));
 
     const preview = useComputed(() => `linear-gradient(90deg, ${colors.value
         .map(({ hex }, index) => `${hex} ${(index / Math.max(colors.value.length - 1, 1)) * 100}%`)
@@ -96,7 +102,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         if (!canAddStop.value) return;
 
         const id = nextId.current;
-        const color = ADDITIONAL_COLORS[(id - INITIAL_COLORS.length) % ADDITIONAL_COLORS.length];
+        const color = ADDITIONAL_COLORS[(id - DEFAULT_PALETTE_CONFIGURATION.colors.length) % ADDITIONAL_COLORS.length];
         const nextStops = [...stops.value, makeStop(id, color)];
 
         batch(() => {
@@ -121,6 +127,70 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         stops.value = reordered;
     };
 
+    const getConfiguration = (): PaletteConfiguration => ({
+        colors: stops.value.map(({ color }) => color),
+        stepCount: stepCount.value,
+        space: space.value,
+        hue: hue.value,
+        easing: easing.value,
+        snapToSourceColors: snapToSourceColors.value,
+    });
+
+    const applyConfiguration = (configuration: PaletteConfiguration) => {
+        batch(() => {
+            stops.value = configuration.colors.map((color, id) => makeStop(id, color));
+            requestedStepCount.value = configuration.stepCount;
+            space.value = configuration.space;
+            hue.value = configuration.hue;
+            easing.value = configuration.easing;
+            snapToSourceColors.value = configuration.snapToSourceColors;
+        });
+
+        nextId.current = configuration.colors.length;
+    };
+
+    const syncHash = () => {
+        const hash = createPaletteHash(getConfiguration(), paletteChecksum.value);
+        if (window.location.hash !== hash) window.history.replaceState(window.history.state, "", hash);
+        return hash;
+    };
+
+    useSignalEffect(() => {
+        const restoredChecksum = expectedChecksum.current;
+        if (restoredChecksum) {
+            expectedChecksum.current = undefined;
+
+            if (restoredChecksum !== paletteChecksum.value) {
+                notify("Shared palette checksum mismatch. It may have been created with a different generator version.", {
+                    duration: 6000,
+                    tone: "warning",
+                });
+            }
+        }
+
+        syncHash();
+    });
+
+    useEffect(() => {
+        const loadHash = () => {
+            const configuration = parsePaletteHash(window.location.hash);
+            if (configuration) {
+                expectedChecksum.current = configuration.checksum;
+                applyConfiguration(configuration);
+            }
+            else syncHash();
+        };
+
+        window.addEventListener("hashchange", loadHash);
+        return () => window.removeEventListener("hashchange", loadHash);
+    }, []);
+
+    const getShareUrl = () => {
+        const url = new URL(window.location.href);
+        url.hash = syncHash();
+        return url.toString();
+    };
+
     const value: GradientGenContextValue = {
         stops,
         stepCount,
@@ -143,6 +213,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         addStop,
         removeStop,
         moveStop,
+        getShareUrl,
     };
 
     return h(GradientGenContext.Provider, { value }, props.children);

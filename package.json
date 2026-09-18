@@ -8,6 +8,7 @@
     "dev": "vite",
     "styles:types": "stc --srcDir ./src --outDir ./st-types --dts --dtsSourceMap",
     "typecheck": "pnpm run styles:types && tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/palette-link.test.ts",
     "build": "vite build",
     "preview": "vite preview"
   },

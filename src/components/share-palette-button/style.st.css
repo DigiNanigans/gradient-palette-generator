@@ -1,0 +1,37 @@
+@st-import [panelBg, panelBorder, uiFgColor, uiMutedColor, accentColor, monoFont] from "../../project.st.css";
+
+.root {
+    -st-mixin: monoFont;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: none;
+    min-height: 2.5rem;
+    padding: 0 0.8rem;
+    color: value(uiMutedColor);
+    background: value(panelBg);
+    border: 1px solid value(panelBorder);
+    border-radius: 0.25rem;
+    cursor: pointer;
+
+    &:hover {
+        color: value(accentColor);
+        border-color: value(uiMutedColor);
+    }
+
+    &:active {
+        color: value(uiFgColor);
+        transform: translateY(1px);
+    }
+}
+
+.icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
