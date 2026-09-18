@@ -3,7 +3,14 @@ import { stVars } from "../project.st.css";
 
 export type InterpolationSpace = "oklch" | "lch" | "oklab" | "lab" | "hsl" | "hwb" | "srgb";
 export type HueMethod = "shorter" | "longer";
-export type ColorDetails = { hex: string; rgb: string; hsl: string };
+export type ColorDetails = {
+    hex: string;
+    rgb: string;
+    hsl: string;
+    hue: number;
+    saturation: number;
+    lightness: number;
+};
 export type ContrastMode = "light" | "dark";
 export type CubicBezierCurve = { x1: number; y1: number; x2: number; y2: number };
 
@@ -205,8 +212,8 @@ export const createPalette = (
     });
 };
 
-export const describeColor = (color: Color): ColorDetails => {
-    const srgb = color.to("srgb").toGamut("srgb");
+export const describeColor = (color: Color | string): ColorDetails => {
+    const srgb = (typeof color === "string" ? new Color(color) : color).to("srgb").toGamut("srgb");
     const [red, green, blue] = srgb.coords.map((coordinate) => Math.round(clamp(coordinate ?? 0, 0, 1) * 255));
     const [rawHue, saturation, lightness] = srgb.to("hsl").coords;
     const hue = typeof rawHue === "number" && Number.isFinite(rawHue) ? rawHue : 0;
@@ -214,5 +221,8 @@ export const describeColor = (color: Color): ColorDetails => {
         hex: srgb.toString({ format: "hex", collapse: false }).toUpperCase(),
         rgb: `${red}, ${green}, ${blue}`,
         hsl: `${round(hue, 1)}°, ${round(saturation ?? 0, 1)}%, ${round(lightness ?? 0, 1)}%`,
+        hue: round(hue, 3),
+        saturation: round(saturation ?? 0, 3),
+        lightness: round(lightness ?? 0, 3),
     };
 };

@@ -14,15 +14,23 @@
     }
 }
 
-.curveRow {
+.panelRow {
     flex-basis: 100%;
+    min-width: 0;
+    padding-top: 1.5rem;
+    border-top: 1px solid value(panelBorder);
 }
 
-.easingToggle {
-    -st-states: expanded;
-
+.panelToggles {
     align-self: end;
     flex: none;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.panelToggle {
+    -st-states: expanded;
+
     display: grid;
     place-items: center;
     width: 2.5rem;

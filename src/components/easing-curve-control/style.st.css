@@ -8,8 +8,6 @@
         "graph label toggle"
         "graph input input";
     gap: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid value(panelBorder);
 }
 
 .graphPanel {

@@ -19,6 +19,8 @@
 
 .color {
     height: 7.5rem;
+    border-radius: value(borderRadius, sm);
+    box-shadow: 1px 1px 2px #000;
 }
 
 .hex {
