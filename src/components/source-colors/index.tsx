@@ -12,7 +12,7 @@ const SourceColors = () => {
 
         <section class={classes.root}>
 
-            <SectionHeading title="Source colors" />
+            <SectionHeading title="Source colours" />
 
             <div class={classes.stopList}>
                 {sourceColors.map((stop, index) => (
@@ -20,7 +20,7 @@ const SourceColors = () => {
                 ))}
 
                 <button class={classes.addButton} type="button" onClick={addStop} disabled={!canAddStop.value}>
-                    <span>Add color</span>
+                    <span>Add colour</span>
                 </button>
             </div>
 

@@ -47,7 +47,7 @@ const BlendSettings = () => {
                 </label>
 
                 <label class={classes.control}>
-                    <span class={classes.label}>Color space</span>
+                    <span class={classes.label}>Colour space</span>
                     <select value={space.value} onChange={(event) => setSpace(event.currentTarget.value as InterpolationSpace)}>
                         {SPACE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
                     </select>
