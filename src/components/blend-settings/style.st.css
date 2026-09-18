@@ -143,6 +143,7 @@
     .card {
         flex-direction: row;
         flex-wrap: wrap;
+        align-items: end;
     }
 
     .control:wide {
