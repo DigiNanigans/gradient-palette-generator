@@ -1,9 +1,10 @@
 import type { ColorDetails } from "~/lib/colors";
-import { classes } from "./style.st.css";
+import { classes, st } from "./style.st.css";
 import { useToast } from "~/hooks/use-toast";
 
 const PaletteSwatch = (props: {
     color: ColorDetails;
+    selected?: boolean;
 }) => {
 
     const { notify } = useToast();
@@ -18,7 +19,7 @@ const PaletteSwatch = (props: {
     };
 
     return (
-        <button class={classes.root} type="button" onClick={copyColor} title={`Copy ${props.color.hex}`}>
+        <button class={st(classes.root, { selected: props.selected })} type="button" onClick={copyColor} title={`Copy ${props.color.hex}`}>
             <span class={classes.color} style={{ background: props.color.hex }} />
             <span class={classes.hex}>
                 {props.color.hex}

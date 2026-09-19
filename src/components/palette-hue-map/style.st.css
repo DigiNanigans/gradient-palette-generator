@@ -58,8 +58,14 @@
     width: 100%;
     height: 10rem;
     border: 1px solid value(panelBorder);
-    border-radius: value(borderRadius, md);
+    border-radius: value(borderRadius, md) 0 0 value(borderRadius, md);
     overflow: hidden;
+}
+
+.visualizations {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
 }
 
 .field {
@@ -76,24 +82,76 @@
     display: block;
     width: 100%;
     height: 100%;
+    touch-action: none;
 }
 
 .point {
-    -st-states: animated;
+    -st-states: animated, selected, dragging, shared;
+
+    cursor: pointer;
+    outline: none;
 
     &:animated {
         transition: transform 160ms ease-out;
+    }
+
+    &:selected .marker {
+        filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 1))
+    }
+
+    &:selected .markerHighlight,
+    &:focus-visible .markerHighlight {
+        stroke: value(uiFgColor);
+        stroke-width: 1.5;
+        opacity: 1;
+    }
+
+    &:selected.sourceMarker .sourceMarkerLine,
+    &:focus-visible.sourceMarker .sourceMarkerLine {
+        stroke: value(uiFgColor);
+    }
+
+    &:selected.sourceMarker .sourceMarkerOutline,
+    &:focus-visible.sourceMarker .sourceMarkerOutline {
+        stroke: #040404;
+    }
+
+    &:dragging.sourceMarker {
+        cursor: grabbing;
+    }
+
+    &:shared {
+        pointer-events: none;
     }
 }
 
 .sourceMarker {
     fill: none;
+    filter: drop-shadow(0 0 1px color-mix(in srgb, value(uiFgColor) 70%, transparent));
+    pointer-events: all;
+    cursor: grab;
+}
+
+.sourceMarkerLine,
+.sourceMarkerOutline {
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.sourceMarkerHitTarget {
+    fill: transparent;
+    stroke: none;
+    pointer-events: all;
+}
+
+.sourceMarkerLine {
     stroke: value(pageBg);
     stroke-width: 2;
-    stroke-linecap: round;
-    filter: drop-shadow(0 0 1px color-mix(in srgb, value(uiFgColor) 70%, transparent));
-    pointer-events: none;
-    vector-effect: non-scaling-stroke;
+}
+
+.sourceMarkerOutline {
+    stroke: transparent;
+    stroke-width: 4;
 }
 
 .marker {
@@ -106,4 +164,110 @@
     fill: none;
     stroke: #040404;
     opacity: 0.5;
+}
+
+.lightnessChart {
+    display: flex;
+    height: 10rem;
+    color: value(uiMutedColor);
+    font-family: value(fontMono);
+    font-size: 0.65rem;
+}
+
+.lightnessTrack {
+    grid-area: track;
+    position: relative;
+    width: 2.25rem;
+    height: 100%;
+    border: 1px solid value(panelBorder);
+    border-radius: 0 value(borderRadius, md) value(borderRadius, md) 0;
+    background: linear-gradient(to bottom, #fff, #808080 50%, #000);
+}
+
+.lightnessIndicator {
+    -st-states: selected, dragging, inverted;
+
+    position: absolute;
+    top: 0;
+    left: -4px;
+    right: 1px;
+    z-index: 0;
+    height: 3px;
+    transform: translateY(var(--lightnessPosition));
+    cursor: grab;
+    touch-action: none;
+    transition: outline 160ms ease;
+
+    &:not(:dragging) {
+        transition: transform 160ms ease;
+    }
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: -0.5rem -1.125rem -0.5rem 0;
+    }
+
+    &:selected {
+        z-index: 1;
+    }
+
+    &:dragging {
+        z-index: 3;
+        cursor: grabbing;
+        transition: none;
+    }
+
+    &:selected,
+    &:dragging {
+        filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 1));
+    }
+
+    &:selected .lightnessGrabberHighlight,
+    &:dragging .lightnessGrabberHighlight {
+        opacity: 1;
+    }
+
+    &:selected .lightnessLine,
+    &:dragging .lightnessLine {
+        background: value(uiFgColor);
+    }
+}
+
+.lightnessLine {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: #040404;
+}
+
+.lightnessGrabber {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    width: 1.125rem;
+    height: 0.75rem;
+    overflow: visible;
+    transform: translateY(-50%);
+    filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 0.5));
+}
+
+.lightnessGrabberShape,
+.lightnessGrabberHighlight {
+    vector-effect: non-scaling-stroke;
+}
+
+.lightnessGrabberShape {
+    fill: var(--hex);
+    stroke: #040404;
+    stroke-width: 1px;
+}
+
+.lightnessGrabberHighlight {
+    fill: none;
+    stroke: value(uiFgColor);
+    stroke-width: 1.5px;
+    opacity: 0;
 }

@@ -10,6 +10,11 @@ const ADDITIONAL_COLORS = ["#8E54E9", "#4776E6", "#24C6DC", "#7ED957", "#FF6B6B"
 const makeStop = (id: number, color: string): ColorStop => ({ id, color, input: color });
 export const isHexColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
 
+export type PalettePointSelection = {
+    kind: "generated" | "source";
+    index: number;
+};
+
 type GradientGenContextValue = {
     stops: ReadonlySignal<ColorStop[]>;
     stepCount: ReadonlySignal<number>;
@@ -22,6 +27,7 @@ type GradientGenContextValue = {
     snapToSourceColors: ReadonlySignal<boolean>;
     colors: ReadonlySignal<ColorDetails[]>;
     preview: ReadonlySignal<string>;
+    selectedPalettePoint: ReadonlySignal<PalettePointSelection | undefined>;
     setStepCount: (value: number) => void;
     setSpace: (value: InterpolationSpace) => void;
     setHue: (value: HueMethod) => void;
@@ -32,6 +38,7 @@ type GradientGenContextValue = {
     addStop: () => void;
     removeStop: (id: number) => void;
     moveStop: (index: number, direction: 1 | -1) => void;
+    selectPalettePoint: (selection: PalettePointSelection | undefined) => void;
     getShareUrl: () => string;
 };
 
@@ -51,6 +58,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const hue = useSignal<HueMethod>(initialConfiguration.hue);
     const easing = useSignal<CubicBezierCurve>({ ...initialConfiguration.easing });
     const snapToSourceColors = useSignal(initialConfiguration.snapToSourceColors);
+    const selectedPalettePoint = useSignal<PalettePointSelection>();
 
     const minStepCount = useComputed(() => stops.value.length);
     const stepCount = useComputed(() => Math.min(
@@ -77,6 +85,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const setSpace = (value: InterpolationSpace) => space.value = value;
     const setHue = (value: HueMethod) => hue.value = value;
     const setSnapToSourceColors = (value: boolean) => snapToSourceColors.value = value;
+    const selectPalettePoint = (selection: PalettePointSelection | undefined) => selectedPalettePoint.value = selection;
 
     const setEasing = (value: CubicBezierCurve) => easing.value = {
         x1: Math.min(1, Math.max(0, value.x1)),
@@ -203,6 +212,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         snapToSourceColors,
         colors,
         preview,
+        selectedPalettePoint,
         setStepCount,
         setSpace,
         setHue,
@@ -213,6 +223,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         addStop,
         removeStop,
         moveStop,
+        selectPalettePoint,
         getShareUrl,
     };
 

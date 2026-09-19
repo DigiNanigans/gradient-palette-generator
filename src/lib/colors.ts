@@ -11,6 +11,40 @@ export type ColorDetails = {
     saturation: number;
     lightness: number;
 };
+
+export const getGeneratedIndexForSource = (colors: ReadonlyArray<Pick<ColorDetails, "hex">>, sourceColors: ReadonlyArray<Pick<ColorDetails, "hex">>, sourceIndex: number) => {
+    if (sourceIndex === 0) return colors.length > 0 ? 0 : undefined;
+    if (sourceIndex === sourceColors.length - 1) return colors.length > 0 ? colors.length - 1 : undefined;
+
+    const source = sourceColors[sourceIndex];
+    if (!source) return undefined;
+
+    const expectedIndex = (sourceIndex / Math.max(sourceColors.length - 1, 1))
+        * Math.max(colors.length - 1, 0);
+    let closestIndex: number | undefined;
+
+    colors.forEach((color, index) => {
+        if (color.hex !== source.hex) return;
+        if (
+            closestIndex === undefined
+            || Math.abs(index - expectedIndex) < Math.abs(closestIndex - expectedIndex)
+        ) closestIndex = index;
+    });
+
+    return closestIndex;
+};
+
+export const getSourceIndexForGenerated = (colors: ReadonlyArray<Pick<ColorDetails, "hex">>, sourceColors: ReadonlyArray<Pick<ColorDetails, "hex">>, generatedIndex: number) => {
+    let matchingSource: number | undefined;
+
+    sourceColors.forEach((_, sourceIndex) => {
+        if (getGeneratedIndexForSource(colors, sourceColors, sourceIndex) !== generatedIndex) return;
+        matchingSource ??= sourceIndex;
+    });
+
+    return matchingSource;
+};
+
 export type ContrastMode = "light" | "dark";
 export type CubicBezierCurve = { x1: number; y1: number; x2: number; y2: number };
 

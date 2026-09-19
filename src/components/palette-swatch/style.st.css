@@ -1,6 +1,8 @@
 @st-import [panelBg, panelBorder, uiFgColor, uiMutedColor, accentColor, fontMono, borderRadius] from "../../project.st.css";
 
 .root {
+    -st-states: selected;
+
     display: flex;
     flex-direction: column;
     border: 1px solid value(panelBorder);
@@ -10,10 +12,17 @@
     cursor: pointer;
     text-align: left;
     padding: 0.35rem;
+    transition: transform 60ms ease;
 
     &:hover {
         border-color: value(uiMutedColor);
         transform: translateY(-1px);
+        transition: none;
+    }
+
+    &:selected {
+        border-color: value(uiMutedColor);
+        transform: scale(1.05) translateY(-1px);
     }
 }
 

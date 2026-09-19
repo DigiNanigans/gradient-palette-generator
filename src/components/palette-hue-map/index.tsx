@@ -1,7 +1,10 @@
 import { batch, useSignal } from "@preact/signals";
+import type { TargetedPointerEvent } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import type { ColorDetails } from "~/lib/colors";
+import { describeColor, getGeneratedIndexForSource, getSourceIndexForGenerated, type ColorDetails } from "~/lib/colors";
+import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import { classes, st } from "./style.st.css";
+import LightnessChart from "./lightness-chart";
 
 const INITIAL_GRAPH_WIDTH = 480;
 const GRAPH_HEIGHT = 160;
@@ -11,6 +14,26 @@ const SOURCE_MARKER_RADIUS = 12;
 const MAX_FIELD_PIXEL_RATIO = 2;
 const UPDATE_THROTTLE_MS = 80;
 const RESIZE_SETTLE_MS = 120;
+const DRAG_START_THRESHOLD = 3;
+
+type DragViewport = {
+    hueStart: number;
+    hueSpan: number;
+    saturationStart: number;
+    saturationEnd: number;
+    reverseHueAxis: boolean;
+};
+
+type DragPointer = {
+    x: number;
+    y: number;
+};
+
+type DragGesture = {
+    origin: DragPointer;
+    offset: DragPointer;
+    active: boolean;
+};
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeHue = (hue: number) => ((hue % 360) + 360) % 360;
@@ -79,17 +102,33 @@ const PaletteHueMap = (props: {
     sourceColors: ColorDetails[];
 }) => {
 
+    const ctx = useGradientGenerator();
+
     const graph = useRef<SVGSVGElement>(null);
     const field = useRef<HTMLCanvasElement>(null);
     const graphWidth = useSignal(INITIAL_GRAPH_WIDTH);
     const pointsReady = useSignal(false);
     const isResizing = useSignal(false);
+    const focusedSource = useSignal<number>();
     const resizeTimer = useRef<number | undefined>(undefined);
     const drawHueMapRef = useRef<() => void>(() => undefined);
     const throttledData = useSignal({ colors: props.colors, sourceColors: props.sourceColors });
     const pendingData = useRef(throttledData.value);
     const lastUpdate = useRef(0);
     const updateTimer = useRef<number | undefined>(undefined);
+    const draggedSource = useRef<number | undefined>(undefined);
+    const draggedSourceLightness = useRef<number | undefined>(undefined);
+    const dragPointer = useRef<DragPointer | undefined>(undefined);
+    const dragGesture = useRef<DragGesture | undefined>(undefined);
+    const dragPointerDirty = useRef(false);
+    const draggedGeneratedIndex = useRef<number | undefined>(undefined);
+    const normalViewportRef = useRef<DragViewport | undefined>(undefined);
+    const dragFrame = useRef<number | undefined>(undefined);
+    const cropResetFrame = useRef<number | undefined>(undefined);
+    const sourceNodes = useRef<Array<SVGGElement | null>>([]);
+    const generatedNodes = useRef<Array<SVGGElement | null>>([]);
+    const directTransforms = useRef({ source: [] as string[], generated: [] as string[] });
+    const dragViewport = useSignal<DragViewport>();
 
     useEffect(() => {
         if (props.colors === throttledData.value.colors && props.sourceColors === throttledData.value.sourceColors) return;
@@ -101,6 +140,12 @@ const PaletteHueMap = (props: {
             lastUpdate.current = Date.now();
             throttledData.value = pendingData.current;
         };
+
+        if (draggedSource.current !== undefined) {
+            if (updateTimer.current !== undefined) window.clearTimeout(updateTimer.current);
+            flushUpdate();
+            return;
+        }
 
         const remaining = UPDATE_THROTTLE_MS - (Date.now() - lastUpdate.current);
 
@@ -115,23 +160,66 @@ const PaletteHueMap = (props: {
 
     useEffect(() => () => {
         if (updateTimer.current !== undefined) window.clearTimeout(updateTimer.current);
+        if (dragFrame.current !== undefined) window.cancelAnimationFrame(dragFrame.current);
+        if (cropResetFrame.current !== undefined) window.cancelAnimationFrame(cropResetFrame.current);
+    }, []);
+
+    useEffect(() => {
+        const clearSelectionOutsideNodes = (event: PointerEvent) => {
+            const target = event.target;
+            if (target instanceof Element && target.closest("[data-palette-point]")) return;
+            focusedSource.value = undefined;
+            ctx.selectPalettePoint(undefined);
+        };
+
+        document.addEventListener("pointerdown", clearSelectionOutsideNodes, true);
+        return () => document.removeEventListener("pointerdown", clearSelectionOutsideNodes, true);
     }, []);
 
     const mapColors = throttledData.value.colors;
     const mapSourceColors = throttledData.value.sourceColors;
     const allColors = [...mapColors, ...mapSourceColors];
-    const hueWindow = getHueWindow(allColors);
-    const saturationWindow = getSaturationWindow(allColors);
+    const normalHueWindow = getHueWindow(allColors);
+    const normalSaturationWindow = getSaturationWindow(allColors);
     const paletteLightness = getPaletteLightness(mapColors);
     const plotWidth = graphWidth.value - (MARKER_INSET * 2);
     const plotHeight = GRAPH_HEIGHT - (MARKER_INSET * 2);
 
-    const unwrapHue = (hue: number) => {
-        return hueWindow.center + ((((normalizeHue(hue) - hueWindow.center) + 540) % 360) - 180);
+    const unwrapHueForWindow = (hue: number, center: number) => {
+        return center + ((((normalizeHue(hue) - center) + 540) % 360) - 180);
     };
 
     const orderedColors = mapColors.filter(({ saturation }) => saturation > 0.5);
-    const reverseHueAxis = orderedColors.length > 1 && unwrapHue(orderedColors[0].hue) > unwrapHue(orderedColors[orderedColors.length - 1].hue);
+    const normalReverseHueAxis = orderedColors.length > 1
+        && unwrapHueForWindow(orderedColors[0].hue, normalHueWindow.center)
+            > unwrapHueForWindow(orderedColors[orderedColors.length - 1].hue, normalHueWindow.center);
+
+    normalViewportRef.current = {
+        hueStart: normalHueWindow.start,
+        hueSpan: normalHueWindow.span,
+        saturationStart: normalSaturationWindow.start,
+        saturationEnd: normalSaturationWindow.end,
+        reverseHueAxis: normalReverseHueAxis,
+    };
+
+    const activeDragViewport = dragViewport.value;
+
+    const hueWindow = activeDragViewport ? {
+        center: activeDragViewport.hueStart + (activeDragViewport.hueSpan / 2),
+        start: activeDragViewport.hueStart,
+        span: activeDragViewport.hueSpan,
+    } : normalHueWindow;
+
+    const saturationWindow = activeDragViewport ? {
+        start: activeDragViewport.saturationStart,
+        end: activeDragViewport.saturationEnd,
+        span: activeDragViewport.saturationEnd - activeDragViewport.saturationStart,
+    } : normalSaturationWindow;
+
+    const reverseHueAxis = activeDragViewport?.reverseHueAxis ?? normalReverseHueAxis;
+    const isDragging = draggedSource.current !== undefined;
+
+    const unwrapHue = (hue: number) => unwrapHueForWindow(hue, hueWindow.center);
 
     const drawHueMap = () => {
         const element = graph.current;
@@ -143,7 +231,8 @@ const PaletteHueMap = (props: {
 
         graphWidth.value = (bounds.width / bounds.height) * GRAPH_HEIGHT;
 
-        const pixelRatio = Math.min(window.devicePixelRatio || 1, MAX_FIELD_PIXEL_RATIO);
+        const pixelRatio = draggedSource.current === undefined ? Math.min(window.devicePixelRatio || 1, MAX_FIELD_PIXEL_RATIO) : 1;
+
         const width = Math.max(1, Math.round(bounds.width * pixelRatio));
         const height = Math.max(1, Math.round(bounds.height * pixelRatio));
         const markerInset = MARKER_INSET * (bounds.height / GRAPH_HEIGHT) * pixelRatio;
@@ -154,7 +243,9 @@ const PaletteHueMap = (props: {
         const context = canvas.getContext("2d");
         if (!context) return;
 
-        for (let y = 0; y < height; y += 1) {
+        const rowHeight = draggedSource.current === undefined ? 1 : 2;
+
+        for (let y = 0; y < height; y += rowHeight) {
             const saturationProgress = clamp((y - markerInset) / Math.max(height - (markerInset * 2), 1), 0, 1,);
             const saturation = saturationWindow.end - (saturationWindow.span * saturationProgress);
             const gradient = context.createLinearGradient(markerInset, 0, width - markerInset, 0);
@@ -167,15 +258,21 @@ const PaletteHueMap = (props: {
             }
 
             context.fillStyle = gradient;
-            context.fillRect(0, y, width, 1);
+            context.fillRect(0, y, width, rowHeight);
         }
     };
 
     drawHueMapRef.current = drawHueMap;
 
-    useEffect(() => {
-        drawHueMap();
-    }, [hueWindow.start, hueWindow.span, paletteLightness, reverseHueAxis, saturationWindow.end, saturationWindow.span]);
+    useEffect(() => drawHueMap(), [
+        hueWindow.start,
+        hueWindow.span,
+        isDragging,
+        paletteLightness,
+        reverseHueAxis,
+        saturationWindow.end,
+        saturationWindow.span
+    ]);
 
     useEffect(() => {
         const element = graph.current;
@@ -219,45 +316,286 @@ const PaletteHueMap = (props: {
         };
     };
 
+    const getPositionInViewport = (color: ColorDetails, viewport: DragViewport) => {
+        const center = viewport.hueStart + (viewport.hueSpan / 2);
+        const hue = color.saturation <= 0.5 ? center : unwrapHueForWindow(color.hue, center);
+        const hueProgress = (hue - viewport.hueStart) / viewport.hueSpan;
+        const saturationSpan = viewport.saturationEnd - viewport.saturationStart;
+
+        return {
+            x: MARKER_INSET + ((viewport.reverseHueAxis ? 1 - hueProgress : hueProgress) * plotWidth),
+            y: MARKER_INSET + (((viewport.saturationEnd - clamp(color.saturation, 0, 100)) / saturationSpan) * plotHeight),
+        };
+    };
+
+    const updateNodeTransforms = (viewport: DragViewport, draggedIndex: number, draggedColor: ColorDetails, pointerPosition: { x: number; y: number }) => {
+        const sourceColors = props.sourceColors.map((color, index) => index === draggedIndex ? draggedColor : color);
+        const generatedIndex = draggedGeneratedIndex.current;
+        const pointerTransform = `translate(${pointerPosition.x} ${pointerPosition.y})`;
+
+        directTransforms.current.source = sourceColors.map((color, index) => {
+            const position = index === draggedIndex ? pointerPosition : getPositionInViewport(color, viewport);
+            const transform = index === draggedIndex ? pointerTransform : `translate(${position.x} ${position.y})`;
+            sourceNodes.current[index]?.setAttribute("transform", transform);
+            return transform;
+        });
+
+        directTransforms.current.generated = ctx.colors.peek().map((color, index) => {
+            const position = index === generatedIndex ? pointerPosition : getPositionInViewport(color, viewport);
+            const transform = index === generatedIndex ? pointerTransform : `translate(${position.x} ${position.y})`;
+            generatedNodes.current[index]?.setAttribute("transform", transform);
+            return transform;
+        });
+    };
+
+    const updateDraggedSource = (pointer: DragPointer, index: number) => {
+        
+        const element = graph.current;
+        const source = props.sourceColors[index];
+        const stop = ctx.stops.value[index];
+        const viewport = dragViewport.value;
+        
+        if (!element || !source || !stop || !viewport) return;
+
+        const bounds = element.getBoundingClientRect();
+        if (bounds.width <= 0 || bounds.height <= 0) return;
+
+        const mappingGraphWidth = graphWidth.value;
+        const mappingPlotWidth = mappingGraphWidth - (MARKER_INSET * 2);
+        const localX = (pointer.x - bounds.left) / bounds.width * mappingGraphWidth;
+        const localY = (pointer.y - bounds.top) / bounds.height * GRAPH_HEIGHT;
+        const x = clamp(localX, MARKER_INSET, mappingGraphWidth - MARKER_INSET);
+        const y = clamp(localY, MARKER_INSET, GRAPH_HEIGHT - MARKER_INSET);
+        const visualHueProgress = (x - MARKER_INSET) / mappingPlotWidth;
+        const hueProgress = viewport.reverseHueAxis ? 1 - visualHueProgress : visualHueProgress;
+        const hue = normalizeHue(viewport.hueStart + (viewport.hueSpan * hueProgress));
+        const saturationProgress = (y - MARKER_INSET) / plotHeight;
+        const saturationSpan = viewport.saturationEnd - viewport.saturationStart;
+        const saturation = viewport.saturationEnd - (saturationSpan * saturationProgress);
+        const lightness = draggedSourceLightness.current ?? source.lightness;
+        const color = describeColor(`hsl(${hue} ${saturation}% ${lightness}%)`);
+
+        if (stop.color !== color.hex) ctx.updateStop(stop.id, color.hex);
+        updateNodeTransforms(viewport, index, color, { x, y });
+    };
+
+    const runDragUpdates = () => {
+        const index = draggedSource.current;
+        const pointer = dragPointer.current;
+
+        if (index === undefined || !pointer) {
+            dragFrame.current = undefined;
+            return;
+        }
+
+        if (dragPointerDirty.current) {
+            dragPointerDirty.current = false;
+            const gesture = dragGesture.current;
+            if (gesture) {
+                const distance = Math.hypot(
+                    pointer.x - gesture.origin.x,
+                    pointer.y - gesture.origin.y,
+                );
+                if (gesture.active || distance >= DRAG_START_THRESHOLD) {
+                    gesture.active = true;
+                    updateDraggedSource({
+                        x: pointer.x + gesture.offset.x,
+                        y: pointer.y + gesture.offset.y,
+                    }, index);
+                }
+            }
+        }
+
+        dragFrame.current = window.requestAnimationFrame(runDragUpdates);
+    };
+
+    const startSourceDrag = (event: TargetedPointerEvent<SVGGElement>, index: number) => {
+
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+
+        if (cropResetFrame.current !== undefined) window.cancelAnimationFrame(cropResetFrame.current);
+        if (dragFrame.current !== undefined) window.cancelAnimationFrame(dragFrame.current);
+
+        const normalViewport = normalViewportRef.current;
+        const markerBounds = event.currentTarget.getBoundingClientRect();
+
+        draggedSource.current = index;
+        draggedGeneratedIndex.current = getGeneratedIndexForSource(props.colors, props.sourceColors, index);
+        draggedSourceLightness.current = props.sourceColors[index]?.lightness ?? 50;
+        dragPointer.current = { x: event.clientX, y: event.clientY };
+        dragGesture.current = {
+            origin: dragPointer.current,
+            offset: {
+                x: markerBounds.left + (markerBounds.width / 2) - event.clientX,
+                y: markerBounds.top + (markerBounds.height / 2) - event.clientY,
+            },
+            active: false,
+        };
+        dragPointerDirty.current = false;
+        batch(() => {
+            dragViewport.value = {
+                hueStart: normalViewport?.hueStart ?? normalHueWindow.start,
+                hueSpan: normalViewport?.hueSpan ?? normalHueWindow.span,
+                saturationStart: normalViewport?.saturationStart ?? normalSaturationWindow.start,
+                saturationEnd: normalViewport?.saturationEnd ?? normalSaturationWindow.end,
+                reverseHueAxis: normalViewport?.reverseHueAxis ?? normalReverseHueAxis,
+            };
+            ctx.selectPalettePoint({ kind: "source", index });
+        });
+        dragFrame.current = window.requestAnimationFrame(runDragUpdates);
+    };
+
+    const moveSourceDrag = (event: TargetedPointerEvent<SVGGElement>, index: number) => {
+        if (draggedSource.current !== index) return;
+        dragPointer.current = { x: event.clientX, y: event.clientY };
+        dragPointerDirty.current = true;
+    };
+
+    const finishSourceDrag = (event: TargetedPointerEvent<SVGGElement>, index: number) => {
+        if (draggedSource.current !== index) return;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+
+        draggedSource.current = undefined;
+        draggedGeneratedIndex.current = undefined;
+        draggedSourceLightness.current = undefined;
+        dragPointer.current = undefined;
+        dragGesture.current = undefined;
+        dragPointerDirty.current = false;
+        
+        if (dragFrame.current !== undefined) window.cancelAnimationFrame(dragFrame.current);
+        
+        dragFrame.current = undefined;
+        
+        if (updateTimer.current !== undefined) window.clearTimeout(updateTimer.current);
+        
+        updateTimer.current = undefined;
+        lastUpdate.current = Date.now();
+        pendingData.current = {
+            colors: props.colors,
+            sourceColors: props.sourceColors
+        };
+        
+        batch(() => {
+            throttledData.value = pendingData.current;
+        });
+
+        cropResetFrame.current = window.requestAnimationFrame(() => {
+            directTransforms.current = { source: [], generated: [] };
+            dragViewport.value = undefined;
+            cropResetFrame.current = undefined;
+        });
+    };
+
+    const selection = ctx.selectedPalettePoint.value;
+    const updateSourceLightness = (index: number, lightness: number) => {
+        const color = props.sourceColors[index];
+        const stop = ctx.stops.value[index];
+        if (!color || !stop) return;
+
+        const nextColor = describeColor(`hsl(${color.hue} ${color.saturation}% ${lightness}%)`);
+        if (nextColor.hex !== stop.color) ctx.updateStop(stop.id, nextColor.hex);
+    };
+
     return (
         <figure class={classes.root}>
             <figcaption class={classes.caption}>
                 <span class={classes.label}>Hue map</span>
             </figcaption>
 
-            <div class={classes.plot}>
-                <canvas ref={field} class={classes.field} aria-hidden="true" />
-                <svg ref={graph} class={classes.graph} viewBox={`0 0 ${graphWidth.value} ${GRAPH_HEIGHT}`}>
-                    {mapSourceColors.map((color, index) => {
-                        const position = getPosition(color);
+            <div class={classes.visualizations}>
+                <div class={classes.plot}>
+                    <canvas ref={field} class={classes.field} aria-hidden="true" />
+                    <svg ref={graph} class={classes.graph} viewBox={`0 0 ${graphWidth.value} ${GRAPH_HEIGHT}`}>
+                        {mapSourceColors.map((color, index) => {
+                            const position = getPosition(color);
+                            const isDragged = isDragging && draggedSource.current === index;
+                            
+                            const isSelected = selection?.kind === "source"
+                                ? selection.index === index
+                                : selection?.kind === "generated" && getSourceIndexForGenerated(mapColors, mapSourceColors, selection.index) === index;
+                            
+                            const transform = isDragging
+                                ? directTransforms.current.source[index] ?? `translate(${position.x} ${position.y})`
+                                : `translate(${position.x} ${position.y})`;
 
-                        return (
-                            <g
-                                class={st(classes.point, { animated: pointsReady.value && !isResizing.value }, classes.sourceMarker)}
-                                transform={`translate(${position.x} ${position.y})`}
-                                key={`source-${index}`}
-                            >
-                                <line x1={-SOURCE_MARKER_RADIUS} y1="0" x2={SOURCE_MARKER_RADIUS} y2="0" />
-                                <line x1="0" y1={-SOURCE_MARKER_RADIUS} x2="0" y2={SOURCE_MARKER_RADIUS} />
-                            </g>
-                        );
-                    })}
+                            return (
+                                <g
+                                    ref={(element) => {
+                                        sourceNodes.current[index] = element;
+                                    }}
+                                    class={st(classes.point, {
+                                        animated: pointsReady.value && !isResizing.value && !isDragged,
+                                        selected: isSelected,
+                                        dragging: isDragged,
+                                    }, classes.sourceMarker)}
+                                    transform={transform}
+                                    key={`source-${index}`}
+                                    data-palette-point="source"
+                                    onClick={() => ctx.selectPalettePoint({ kind: "source", index })}
+                                    onPointerDown={(event) => startSourceDrag(event, index)}
+                                    onPointerMove={(event) => moveSourceDrag(event, index)}
+                                    onPointerUp={(event) => finishSourceDrag(event, index)}
+                                    onPointerCancel={(event) => finishSourceDrag(event, index)}
+                                >
+                                    <circle class={classes.sourceMarkerHitTarget} cx="0" cy="0" r={SOURCE_MARKER_RADIUS} />
+                                    <line class={classes.sourceMarkerOutline} x1={-SOURCE_MARKER_RADIUS} y1="0" x2={SOURCE_MARKER_RADIUS} y2="0" />
+                                    <line class={classes.sourceMarkerOutline} x1="0" y1={-SOURCE_MARKER_RADIUS} x2="0" y2={SOURCE_MARKER_RADIUS} />
+                                    <line class={classes.sourceMarkerLine} x1={-SOURCE_MARKER_RADIUS} y1="0" x2={SOURCE_MARKER_RADIUS} y2="0" />
+                                    <line class={classes.sourceMarkerLine} x1="0" y1={-SOURCE_MARKER_RADIUS} x2="0" y2={SOURCE_MARKER_RADIUS} />
+                                </g>
+                            );
+                        })}
 
-                    {mapColors.map((color, index) => {
-                        const position = getPosition(color);
+                        {mapColors.map((color, index) => {
+                            const position = getPosition(color);
+                            const isDragged = isDragging && draggedGeneratedIndex.current === index;
+                            const selectedGeneratedIndex = selection?.kind === "source"
+                                ? getGeneratedIndexForSource(mapColors, mapSourceColors, selection.index)
+                                : selection?.kind === "generated"
+                                    ? selection.index
+                                    : undefined;
+                            const isSelected = selectedGeneratedIndex === index;
+                            const sourceIndex = getSourceIndexForGenerated(mapColors, mapSourceColors, index);
+                            const transform = isDragging
+                                ? directTransforms.current.generated[index] ?? `translate(${position.x} ${position.y})`
+                                : `translate(${position.x} ${position.y})`;
 
-                        return (
-                            <g
-                                class={st(classes.point, { animated: pointsReady.value && !isResizing.value })}
-                                transform={`translate(${position.x} ${position.y})`}
-                                key={index}
-                            >
-                                <circle class={classes.marker} cx="0" cy="0" r="8" fill={color.hex} />
-                                <circle class={classes.markerHighlight} cx="0" cy="0" r="8" />
-                            </g>
-                        );
-                    })}
-                </svg>
+                            return (
+                                <g
+                                    ref={(element) => {
+                                        generatedNodes.current[index] = element;
+                                    }}
+                                    class={st(classes.point, {
+                                        animated: pointsReady.value && !isResizing.value && !isDragged,
+                                        selected: isSelected,
+                                        shared: sourceIndex !== undefined,
+                                    })}
+                                    transform={transform}
+                                    key={index}
+                                    data-palette-point="generated"
+                                    onClick={() => ctx.selectPalettePoint(sourceIndex === undefined
+                                        ? { kind: "generated", index }
+                                        : { kind: "source", index: sourceIndex })}
+                                >
+                                    <circle class={classes.marker} cx="0" cy="0" r="8" fill={color.hex} />
+                                    <circle class={classes.markerHighlight} cx="0" cy="0" r={isSelected ? 9 : 8} />
+                                </g>
+                            );
+                        })}
+                    </svg>
+                </div>
+
+                <LightnessChart
+                    colors={props.sourceColors}
+                    selectedIndex={selection?.kind === "source" ? selection.index : undefined}
+                    focusedIndex={focusedSource.value}
+                    onSelect={(index) => ctx.selectPalettePoint({ kind: "source", index })}
+                    onFocusedIndexChange={(index) => focusedSource.value = index}
+                    onLightnessChange={updateSourceLightness}
+                />
             </div>
 
         </figure>
