@@ -2,9 +2,13 @@ import { describeColor, type HueMethod, type InterpolationSpace } from "~/lib/co
 import { classes, st, vars } from "./style.st.css";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import SectionHeading from "../section-heading";
-import { useComputed, useSignal } from "@preact/signals";
+import { useComputed } from "@preact/signals";
 import EasingCurveControl from "../easing-curve-control";
 import PaletteHueMap from "../palette-hue-map";
+import { useSessionStore } from "~/hooks/use-session-store";
+
+const EASING_PANEL_STORAGE_KEY = "easing-expanded";
+const HUE_MAP_PANEL_STORAGE_KEY = "hue-map-expanded";
 
 const SPACE_OPTIONS: Array<{ value: InterpolationSpace; label: string }> = [
     { value: "oklch", label: "OKLCH" },
@@ -21,8 +25,8 @@ const BlendSettings = () => {
     const { colors, stops, stepCount, minStepCount, maxStepCount, space, hue, setStepCount, setSpace, setHue } = useGradientGenerator();
     const rangeProgress = useComputed(() => maxStepCount === minStepCount.value ? 100 : ((stepCount.value - minStepCount.value) / (maxStepCount - minStepCount.value)) * 100);
     const sourceColors = useComputed(() => stops.value.map(({ color }) => describeColor(color)));
-    const showEasingControls = useSignal(false);
-    const showHueMap = useSignal(false);
+    const showEasingControls = useSessionStore(EASING_PANEL_STORAGE_KEY);
+    const showHueMap = useSessionStore(HUE_MAP_PANEL_STORAGE_KEY);
 
     return (
         <section class={classes.root}>
