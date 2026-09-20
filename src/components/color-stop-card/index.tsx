@@ -2,6 +2,7 @@ import { ColorStop } from "~/types/gradient";
 import { classes, st, vars } from "./style.st.css";
 import { isHexColor, useGradientGenerator } from "~/hooks/use-gradient-generator";
 import { getContrastMode } from "~/lib/colors";
+import { useRef } from "preact/hooks";
 
 const ColorStopCard = (props: {
     stop: ColorStop,
@@ -9,8 +10,21 @@ const ColorStopCard = (props: {
     total: number
 }) => {
 
-    const { updateStop, commitStop, moveStop, removeStop } = useGradientGenerator();
+    const { updateStop, commitStop, moveStop, removeStop, beginHistoryTransaction, endHistoryTransaction } = useGradientGenerator();
     const textMode = getContrastMode(props.stop.color);
+    const pickerTransactionActive = useRef(false);
+
+    const beginPickerTransaction = () => {
+        if (pickerTransactionActive.current) return;
+        pickerTransactionActive.current = true;
+        beginHistoryTransaction();
+    };
+    
+    const endPickerTransaction = () => {
+        if (!pickerTransactionActive.current) return;
+        pickerTransactionActive.current = false;
+        endHistoryTransaction();
+    };
 
     return (
         <article class={classes.root} style={{[vars.stopColor]: props.stop.color }}>
@@ -20,7 +34,16 @@ const ColorStopCard = (props: {
                     class={classes.picker}
                     type="color"
                     value={props.stop.color}
-                    onInput={(event) => updateStop(props.stop.id, event.currentTarget.value)}
+                    onFocus={beginPickerTransaction}
+                    onInput={(event) => {
+                        beginPickerTransaction();
+                        updateStop(props.stop.id, event.currentTarget.value);
+                    }}
+                    onChange={(event) => {
+                        updateStop(props.stop.id, event.currentTarget.value);
+                        endPickerTransaction();
+                    }}
+                    onBlur={endPickerTransaction}
                 />
 
                 <div class={st(classes.hexField, {
