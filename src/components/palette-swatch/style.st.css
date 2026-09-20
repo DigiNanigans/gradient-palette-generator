@@ -1,7 +1,7 @@
-@st-import [panelBg, panelBorder, uiFgColor, uiMutedColor, accentColor, fontMono, borderRadius] from "../../project.st.css";
+@st-import [panelBg, panelBorder, uiFgColor, uiFgDark, uiMutedColor, accentColor, fontMono, borderRadius] from "../../project.st.css";
 
 .root {
-    -st-states: selected;
+    -st-states: selected, mode(enum(light, dark));
 
     display: flex;
     flex-direction: column;
@@ -27,15 +27,59 @@
 }
 
 .color {
+    position: relative;
+
     width: 100%;
     height: 7.5rem;
     border-radius: value(borderRadius, sm);
+    overflow: hidden;
+    background: var(--swatchColor);
+    background: radial-gradient(
+        var(--swatchColor),
+        var(--swatchColor),
+        color-mix(var(--swatchColor), #fff 10%))
+        bottom right;
+    background-size: 200% 200%;
     box-shadow: 1px 1px 2px #000;
+
+    .root:mode(light) & {
+        color: value(uiFgColor);
+        background: radial-gradient(
+            var(--swatchColor),
+            var(--swatchColor),
+            color-mix(var(--swatchColor), #000 10%))
+            bottom right;
+        background-size: 200% 200%;
+    }
+
+    .root:mode(dark) & {
+        color: value(uiFgDark);
+    }
+}
+
+.index {
+    position: absolute;
+    bottom: -0.5rem;
+    right: 0;
+    color: inherit;
+    font-size: 6.5rem;
+    font-weight: bold;
+    line-height: 1;
+    opacity: 0.1;
+    pointer-events: none;
+    letter-spacing: -0.066em;
 }
 
 .hex {
-    padding: 0.5rem 0.25rem 0.25rem;
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    z-index: 1;
+
+    color: inherit;
     font-family: value(fontMono);
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: right;
+    text-transform: uppercase;
 }

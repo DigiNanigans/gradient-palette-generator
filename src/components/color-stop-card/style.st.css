@@ -1,11 +1,24 @@
 @st-import [monoFont, pageBg, panelBg, panelBorder, uiFgColor, uiFgDark, uiMutedColor, accentColor, fontMono, borderRadius] from "../../project.st.css";
 
 .root {
+    -st-states: mode(enum(light, dark)), selected;
+
     min-width: 0;
     padding: 0.6rem;
     border: 1px solid value(panelBorder);
     border-radius: value(borderRadius, md);
     background: value(panelBg);
+    transition: transform 60ms ease;
+
+    &:hover {
+        border-color: value(uiMutedColor);
+        transition: none;
+    }
+
+    &:selected {
+        border-color: value(uiMutedColor);
+        transform: translateX(0.25rem);
+    }
 }
 
 .colorWell {
@@ -14,9 +27,23 @@
     border-radius: value(borderRadius, sm);
     overflow: hidden;
     background: var(--stopColor);
+    background: radial-gradient(
+        var(--stopColor),
+        var(--stopColor),
+        color-mix(var(--stopColor), #fff 10%))
+        bottom right;
+    background-size: 200% 200%;
     cursor: pointer;
     position: relative;
     box-shadow: 1px 1px 2px #000;
+
+    .root:mode(light) & {
+        background: radial-gradient(
+        var(--stopColor),
+        var(--stopColor),
+        color-mix(var(--stopColor), #000 10%))
+        bottom right;
+    }
 }
 
 .picker {
@@ -29,12 +56,26 @@
 }
 
 .hexField {
-    -st-states: invalid, mode(enum(light, dark));
+    -st-states: invalid;
 
     position: absolute;
     bottom: 0.5rem;
     right: 0.5rem;
     z-index: 1;
+
+    & .index {
+        color: inherit;
+        font-size: 8.5rem;
+        font-weight: bold;
+        line-height: 1;
+        opacity: 0.1;
+        pointer-events: none;
+        user-select: none;
+        position: absolute;
+        bottom: -1.5rem;
+        right: -0.5rem;
+        letter-spacing: -0.066em;
+    }
 
     & input {
         width: 6.4rem;
@@ -52,11 +93,11 @@
         transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
     }
 
-    &:mode(light) {
+    .root:mode(light) & {
         color: value(uiFgColor);
     }
 
-    &:mode(dark) {
+    .root:mode(dark) & {
         color: value(uiFgDark);
     }
 

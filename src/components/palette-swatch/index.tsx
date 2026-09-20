@@ -1,13 +1,15 @@
-import type { ColorDetails } from "~/lib/colors";
-import { classes, st } from "./style.st.css";
+import { getContrastMode, type ColorDetails } from "~/lib/colors";
+import { classes, st, vars } from "./style.st.css";
 import { useToast } from "~/hooks/use-toast";
 
 const PaletteSwatch = (props: {
     color: ColorDetails;
+    sourceIndex?: number;
     selected?: boolean;
 }) => {
 
     const { notify } = useToast();
+    const indexMode = getContrastMode(props.color.hex);
 
     const copyColor = async () => {
         try {
@@ -19,10 +21,18 @@ const PaletteSwatch = (props: {
     };
 
     return (
-        <button class={st(classes.root, { selected: props.selected })} type="button" onClick={copyColor} title={`Copy ${props.color.hex}`}>
-            <span class={classes.color} style={{ background: props.color.hex }} />
-            <span class={classes.hex}>
-                {props.color.hex}
+        <button
+            class={st(classes.root, { selected: props.selected, mode: indexMode })}
+            type="button"
+            onClick={copyColor}
+            title={`Copy ${props.color.hex}`}
+            style={{ [vars.swatchColor]: props.color.hex }}
+        >
+            <span class={classes.color}>
+                {props.sourceIndex !== undefined && (
+                    <span class={classes.index}>{(props.sourceIndex + 1).toString().padStart(2, '0')}</span>
+                )}
+                <span class={classes.hex}>{props.color.hex}</span>
             </span>
         </button>
     );

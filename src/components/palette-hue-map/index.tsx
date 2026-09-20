@@ -774,6 +774,15 @@ const PaletteHueMap = (props: {
                                     <line class={classes.sourceMarkerOutline} x1="0" y1={-SOURCE_MARKER_RADIUS} x2="0" y2={SOURCE_MARKER_RADIUS} />
                                     <line class={classes.sourceMarkerLine} x1={-SOURCE_MARKER_RADIUS} y1="0" x2={SOURCE_MARKER_RADIUS} y2="0" />
                                     <line class={classes.sourceMarkerLine} x1="0" y1={-SOURCE_MARKER_RADIUS} x2="0" y2={SOURCE_MARKER_RADIUS} />
+                                    <g
+                                        class={classes.nodeIndexBadge}
+                                        transform={`translate(${SOURCE_MARKER_RADIUS + 3} ${-SOURCE_MARKER_RADIUS - 15})`}
+                                    >
+                                        <path class={classes.nodeIndexBadgeShape} d="M4 0 H20 Q23 0 23 3 V12 Q23 15 20 15 H5 L1 17 L1 12 V3 Q1 0 4 0 Z" />
+                                        <text class={classes.nodeIndex} x="12" y="10.5" text-anchor="middle">
+                                            {(index + 1).toString().padStart(2, '0')}
+                                        </text>
+                                    </g>
                                 </g>
                             );
                         })}

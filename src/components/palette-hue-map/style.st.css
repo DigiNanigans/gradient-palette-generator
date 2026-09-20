@@ -1,4 +1,4 @@
-@st-import [fontMono, panelBorder, uiFgColor, uiMutedColor, pageBg, fieldLabel, borderRadius] from "../../project.st.css";
+@st-import [fontMono, panelBg, panelBorder, uiFgColor, uiMutedColor, pageBg, fieldLabel, borderRadius] from "../../project.st.css";
 
 .root {
     -st-states: addMode, removeMode;
@@ -177,6 +177,25 @@
 
 .marker {
     filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.5))
+}
+
+.nodeIndexBadge {
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+    pointer-events: none;
+    user-select: none;
+}
+
+.nodeIndexBadgeShape {
+    fill: value(panelBg);
+    stroke: none;
+}
+
+.nodeIndex {
+    fill: value(uiMutedColor);
+    font-family: value(fontMono);
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1;
 }
 
 .markerHighlight {
