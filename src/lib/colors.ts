@@ -239,6 +239,31 @@ export const getPaletteSourcePositions = (
     hue: HueMethod,
 ) => getSourcePositionsForMetrics(getRangeMetrics(createColorRanges(sourceColors, space, hue)));
 
+const getColorSegmentLength = (start: string, end: string, space: InterpolationSpace, hue: HueMethod) => (
+    getRangeMetrics(createColorRanges([start, end], space, hue))[0].length
+);
+
+export const getInsertionIndex = (sourceColors: string[], color: string, space: InterpolationSpace, hue: HueMethod) => {
+    if (sourceColors.length === 0) return 0;
+
+    let bestIndex = 0;
+    let smallestAddedLength = getColorSegmentLength(color, sourceColors[0], space, hue);
+
+    for (let index = 1; index < sourceColors.length; index += 1) {
+        const addedLength = getColorSegmentLength(sourceColors[index - 1], color, space, hue)
+            + getColorSegmentLength(color, sourceColors[index], space, hue)
+            - getColorSegmentLength(sourceColors[index - 1], sourceColors[index], space, hue);
+
+        if (addedLength < smallestAddedLength) {
+            bestIndex = index;
+            smallestAddedLength = addedLength;
+        }
+    }
+
+    const appendLength = getColorSegmentLength(sourceColors[sourceColors.length - 1], color, space, hue);
+    return appendLength < smallestAddedLength ? sourceColors.length : bestIndex;
+};
+
 export const createPalette = (
     sourceColors: string[],
     steps: number,

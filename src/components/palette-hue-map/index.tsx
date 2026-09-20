@@ -1,7 +1,7 @@
 import { batch, useSignal } from "@preact/signals";
-import type { TargetedPointerEvent } from "preact";
+import type { TargetedMouseEvent, TargetedPointerEvent } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { describeColor, getPaletteSourcePositions, getSnappedGeneratedIndexes, type ColorDetails } from "~/lib/colors";
+import { describeColor, getPaletteSourcePositions, getInsertionIndex, getSnappedGeneratedIndexes, type ColorDetails } from "~/lib/colors";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import { classes, st } from "./style.st.css";
 import LightnessChart from "./lightness-chart";
@@ -111,7 +111,10 @@ const PaletteHueMap = (props: {
     const graphWidth = useSignal(INITIAL_GRAPH_WIDTH);
     const pointsReady = useSignal(false);
     const isResizing = useSignal(false);
+    const suppressPointTransitions = useSignal(false);
     const focusedSource = useSignal<number>();
+    const addSourceMode = useSignal(false);
+    const removeSourceMode = useSignal(false);
     const resizeTimer = useRef<number | undefined>(undefined);
     const drawHueMapRef = useRef<() => void>(() => undefined);
     const throttledData = useSignal({ colors: props.colors, sourceColors: props.sourceColors });
@@ -125,12 +128,16 @@ const PaletteHueMap = (props: {
     const dragPointer = useRef<DragPointer | undefined>(undefined);
     const dragGesture = useRef<DragGesture | undefined>(undefined);
     const dragPointerDirty = useRef(false);
+    const pointerWithinHueMap = useRef(false);
+    const capturedAltPress = useRef(false);
     const draggedGeneratedIndex = useRef<number | undefined>(undefined);
     const settlingGeneratedIndex = useSignal<number>();
     const settleGeneratedTimer = useRef<number | undefined>(undefined);
     const normalViewportRef = useRef<DragViewport | undefined>(undefined);
     const dragFrame = useRef<number | undefined>(undefined);
     const cropResetFrame = useRef<number | undefined>(undefined);
+    const transitionSuppressionFrame = useRef<number | undefined>(undefined);
+    const transitionRestoreFrame = useRef<number | undefined>(undefined);
     const sourceNodes = useRef<Array<SVGGElement | null>>([]);
     const generatedNodes = useRef<Array<SVGGElement | null>>([]);
     const directTransforms = useRef({ source: [] as string[], generated: [] as string[] });
@@ -147,7 +154,8 @@ const PaletteHueMap = (props: {
             throttledData.value = pendingData.current;
         };
 
-        if (draggedSource.current !== undefined) {
+        const sourceStructureChanged = props.sourceColors.length !== throttledData.value.sourceColors.length;
+        if (draggedSource.current !== undefined || sourceStructureChanged) {
             if (updateTimer.current !== undefined) window.clearTimeout(updateTimer.current);
             flushUpdate();
             return;
@@ -169,6 +177,8 @@ const PaletteHueMap = (props: {
         if (settleGeneratedTimer.current !== undefined) window.clearTimeout(settleGeneratedTimer.current);
         if (dragFrame.current !== undefined) window.cancelAnimationFrame(dragFrame.current);
         if (cropResetFrame.current !== undefined) window.cancelAnimationFrame(cropResetFrame.current);
+        if (transitionSuppressionFrame.current !== undefined) window.cancelAnimationFrame(transitionSuppressionFrame.current);
+        if (transitionRestoreFrame.current !== undefined) window.cancelAnimationFrame(transitionRestoreFrame.current);
     }, []);
 
     useEffect(() => {
@@ -183,8 +193,43 @@ const PaletteHueMap = (props: {
         return () => document.removeEventListener("pointerdown", clearSelectionOutsideNodes, true);
     }, []);
 
-    const mapColors = throttledData.value.colors;
-    const mapSourceColors = throttledData.value.sourceColors;
+    useEffect(() => {
+        const updateModifierModes = (event: KeyboardEvent) => {
+            const isPlainAlt = event.key === "Alt" && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+
+            if (isPlainAlt && event.type === "keydown" && (pointerWithinHueMap.current || draggedSource.current !== undefined)) {
+                capturedAltPress.current = true;
+            }
+
+            if (isPlainAlt && capturedAltPress.current) {
+                event.preventDefault();
+                if (event.type === "keyup") capturedAltPress.current = false;
+            }
+
+            addSourceMode.value = event.ctrlKey && !event.altKey;
+            removeSourceMode.value = event.altKey;
+        };
+
+        const clearModifierModes = () => {
+            addSourceMode.value = false;
+            removeSourceMode.value = false;
+            capturedAltPress.current = false;
+        };
+
+        window.addEventListener("keydown", updateModifierModes, true);
+        window.addEventListener("keyup", updateModifierModes, true);
+        window.addEventListener("blur", clearModifierModes);
+
+        return () => {
+            window.removeEventListener("keydown", updateModifierModes, true);
+            window.removeEventListener("keyup", updateModifierModes, true);
+            window.removeEventListener("blur", clearModifierModes);
+        };
+    }, []);
+
+    const sourceStructureChanged = props.sourceColors.length !== throttledData.value.sourceColors.length;
+    const mapColors = sourceStructureChanged ? props.colors : throttledData.value.colors;
+    const mapSourceColors = sourceStructureChanged ? props.sourceColors : throttledData.value.sourceColors;
 
     const snappedGeneratedIndexes = ctx.snapToSourceColors.value
         ? getSnappedGeneratedIndexes(
@@ -382,7 +427,7 @@ const PaletteHueMap = (props: {
         const source = props.sourceColors[index];
         const stop = ctx.stops.value[index];
         const viewport = dragViewport.value;
-        
+
         if (!element || !source || !stop || !viewport) return;
 
         const bounds = element.getBoundingClientRect();
@@ -482,6 +527,8 @@ const PaletteHueMap = (props: {
 
     const startSourceDrag = (event: TargetedPointerEvent<SVGGElement>, index: number) => {
 
+        if (event.altKey || event.ctrlKey) return;
+
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
 
@@ -546,9 +593,9 @@ const PaletteHueMap = (props: {
         dragPointer.current = undefined;
         dragGesture.current = undefined;
         dragPointerDirty.current = false;
-        
+
         if (dragFrame.current !== undefined) window.cancelAnimationFrame(dragFrame.current);
-        
+
         dragFrame.current = undefined;
         
         if (updateTimer.current !== undefined) window.clearTimeout(updateTimer.current);
@@ -581,19 +628,85 @@ const PaletteHueMap = (props: {
         if (nextColor.hex !== stop.color) ctx.updateStop(stop.id, nextColor.hex);
     };
 
+    const withoutPointTransitions = (action: () => void) => {
+        if (transitionSuppressionFrame.current !== undefined) window.cancelAnimationFrame(transitionSuppressionFrame.current);
+        if (transitionRestoreFrame.current !== undefined) window.cancelAnimationFrame(transitionRestoreFrame.current);
+        suppressPointTransitions.value = true;
+        action();
+        transitionSuppressionFrame.current = window.requestAnimationFrame(() => {
+            transitionSuppressionFrame.current = undefined;
+            transitionRestoreFrame.current = window.requestAnimationFrame(() => {
+                transitionRestoreFrame.current = undefined;
+                suppressPointTransitions.value = false;
+            });
+        });
+    };
+
+    const insertSourceColor = (color: ColorDetails, enableSnapping = false) => {
+        if (!ctx.canAddStop.peek()) return;
+        const sourceColors = ctx.stops.peek().map(({ color: sourceColor }) => sourceColor);
+
+        const insertionIndex = getInsertionIndex(
+            sourceColors,
+            color.hex,
+            ctx.space.peek(),
+            ctx.hue.peek(),
+        );
+
+        withoutPointTransitions(() => {
+            ctx.insertStop(color.hex, insertionIndex, enableSnapping);
+            ctx.selectPalettePoint({ kind: "source", index: insertionIndex });
+        });
+    };
+
+    const addSourceAtPointer = (event: TargetedMouseEvent<SVGSVGElement>) => {
+        if (!event.ctrlKey || event.altKey || !ctx.canAddStop.peek()) return;
+
+        const element = graph.current;
+        if (!element) return;
+        const bounds = element.getBoundingClientRect();
+        if (bounds.width <= 0 || bounds.height <= 0) return;
+
+        event.preventDefault();
+
+        const localX = (event.clientX - bounds.left) / bounds.width * graphWidth.value;
+        const localY = (event.clientY - bounds.top) / bounds.height * GRAPH_HEIGHT;
+        const x = clamp(localX, MARKER_INSET, graphWidth.value - MARKER_INSET);
+        const y = clamp(localY, MARKER_INSET, GRAPH_HEIGHT - MARKER_INSET);
+        const visualHueProgress = (x - MARKER_INSET) / Math.max(graphWidth.value - (MARKER_INSET * 2), 1);
+        const hueProgress = reverseHueAxis ? 1 - visualHueProgress : visualHueProgress;
+        const hue = normalizeHue(hueWindow.start + (hueWindow.span * hueProgress));
+        const saturationProgress = (y - MARKER_INSET) / plotHeight;
+        const saturation = saturationWindow.end - (saturationWindow.span * saturationProgress);
+
+        insertSourceColor(describeColor(`hsl(${hue} ${saturation}% ${paletteLightness}%)`));
+    };
+
     return (
-        <figure class={classes.root}>
+        <figure class={st(classes.root, { addMode: addSourceMode.value, removeMode: removeSourceMode.value })}>
             <figcaption class={classes.caption}>
                 <span class={classes.label}>Hue map</span>
+                <span class={classes.interactionCue} aria-live="polite">
+                    {addSourceMode.value
+                        ? "Click anywhere on the map to add a new source colour"
+                        : removeSourceMode.value
+                            ? "Click a source colour node to remove it"
+                            : "Ctrl + click to add source colour · Alt + click on a source to remove · Double-click a generated colour node to conver it to a source colour"}
+                </span>
             </figcaption>
 
             <div class={classes.visualizations}>
                 <div class={classes.plot}>
                     <canvas ref={field} class={classes.field} aria-hidden="true" />
-                    <svg ref={graph} class={classes.graph} viewBox={`0 0 ${graphWidth.value} ${GRAPH_HEIGHT}`}>
+                    <svg ref={graph} class={classes.graph} viewBox={`0 0 ${graphWidth.value} ${GRAPH_HEIGHT}`}
+                        onPointerEnter={() => pointerWithinHueMap.current = true}
+                        onPointerLeave={() => pointerWithinHueMap.current = false}
+                        onClick={addSourceAtPointer}
+                    >
                         {mapSourceColors.map((color, index) => {
                             const position = getPosition(color);
                             const isDragged = isDragging && draggedSource.current === index;
+                            const stopId = ctx.stops.value[index]?.id;
                             
                             const isSelected = selection?.kind === "source"
                                 ? selection.index === index
@@ -609,14 +722,33 @@ const PaletteHueMap = (props: {
                                         sourceNodes.current[index] = element;
                                     }}
                                     class={st(classes.point, {
-                                        animated: pointsReady.value && !isResizing.value && !isDragged,
+                                        animated: pointsReady.value && !isResizing.value && !isDragged && !suppressPointTransitions.value,
                                         selected: isSelected,
                                         dragging: isDragged,
                                     }, classes.sourceMarker)}
                                     transform={transform}
-                                    key={`source-${index}`}
+                                    key={`source-${stopId ?? index}`}
                                     data-palette-point="source"
-                                    onClick={() => ctx.selectPalettePoint({ kind: "source", index })}
+                                    onClick={(event) => {
+                                        if (event.altKey) {
+                                            event.stopPropagation();
+                                            const stop = ctx.stops.peek()[index];
+                                            if (stop) withoutPointTransitions(() => ctx.removeStop(stop.id));
+                                        } else if (!event.ctrlKey) {
+                                            ctx.selectPalettePoint({ kind: "source", index });
+                                        }
+                                    }}
+                                    onDblClick={(event) => {
+                                        event.stopPropagation();
+                                        if (index === 0 || index === mapSourceColors.length - 1) return;
+                                        const stop = ctx.stops.peek()[index];
+                                        if (stop) {
+                                            withoutPointTransitions(() => {
+                                                ctx.selectPalettePoint(undefined);
+                                                ctx.removeStop(stop.id);
+                                            });
+                                        }
+                                    }}
                                     onPointerDown={(event) => startSourceDrag(event, index)}
                                     onPointerMove={(event) => moveSourceDrag(event, index)}
                                     onPointerUp={(event) => finishSourceDrag(event, index)}
@@ -651,7 +783,7 @@ const PaletteHueMap = (props: {
                                         generatedNodes.current[index] = element;
                                     }}
                                     class={st(classes.point, {
-                                        animated: pointsReady.value && !isResizing.value && (!isDragged || settlingGeneratedIndex.value === index),
+                                        animated: pointsReady.value && !isResizing.value && !suppressPointTransitions.value && (!isDragged || settlingGeneratedIndex.value === index),
                                         selected: isSelected,
                                         shared: sourceIndex !== undefined,
                                     })}
@@ -661,6 +793,10 @@ const PaletteHueMap = (props: {
                                     onClick={() => ctx.selectPalettePoint(sourceIndex === undefined
                                         ? { kind: "generated", index }
                                         : { kind: "source", index: sourceIndex })}
+                                    onDblClick={(event) => {
+                                        event.stopPropagation();
+                                        insertSourceColor(color, true);
+                                    }}
                                 >
                                     <circle class={classes.marker} cx="0" cy="0" r="8" fill={color.hex} />
                                     <circle class={classes.markerHighlight} cx="0" cy="0" r={isSelected ? 9 : 8} />

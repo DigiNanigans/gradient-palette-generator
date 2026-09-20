@@ -1,7 +1,18 @@
 @st-import [fontMono, panelBorder, uiFgColor, uiMutedColor, pageBg, fieldLabel, borderRadius] from "../../project.st.css";
 
 .root {
+    -st-states: addMode, removeMode;
+
     margin: 0;
+
+    &:addMode .graph,
+    &:addMode .point {
+        cursor: copy;
+    }
+
+    &:removeMode .sourceMarker {
+        cursor: not-allowed;
+    }
 }
 
 .caption {
@@ -14,6 +25,16 @@
 
 .label {
     -st-extends: fieldLabel;
+}
+
+.interactionCue {
+    color: value(uiMutedColor);
+    line-height: 1.45;
+}
+
+.root:addMode .interactionCue,
+.root:removeMode .interactionCue {
+    color: value(uiFgColor);
 }
 
 .key {

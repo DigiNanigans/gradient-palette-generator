@@ -47,6 +47,7 @@ type GradientGenContextValue = {
     updateStop: (id: number, input: string) => void;
     commitStop: (id: number) => void;
     addStop: () => void;
+    insertStop: (color: string, index: number, enableSnapping?: boolean) => void;
     removeStop: (id: number) => void;
     moveStop: (index: number, direction: 1 | -1) => void;
     selectPalettePoint: (selection: PalettePointSelection | undefined) => void;
@@ -154,21 +155,29 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         stops.value = stops.value.map((stop) => stop.id === id ? { ...stop, input: stop.color } : stop);
     };
 
-    const addStop = () => {
+    const insertStop = (color: string, index: number, enableSnapping = false) => {
         if (!canAddStop.value) return;
 
         mutateConfiguration(() => {
             const id = nextId.current;
-            const color = ADDITIONAL_COLORS[(id - DEFAULT_PALETTE_CONFIGURATION.colors.length) % ADDITIONAL_COLORS.length];
-            const nextStops = [...stops.value, makeStop(id, color)];
+            const insertionIndex = Math.min(stops.value.length, Math.max(0, index));
+            const nextStops = [...stops.value];
+            nextStops.splice(insertionIndex, 0, makeStop(id, color));
 
             batch(() => {
                 stops.value = nextStops;
                 requestedStepCount.value = Math.max(requestedStepCount.value, nextStops.length);
+                if (enableSnapping) snapToSourceColors.value = true;
             });
 
             nextId.current += 1;
         });
+    };
+
+    const addStop = () => {
+        const id = nextId.current;
+        const color = ADDITIONAL_COLORS[(id - DEFAULT_PALETTE_CONFIGURATION.colors.length) % ADDITIONAL_COLORS.length];
+        insertStop(color, stops.value.length);
     };
 
     const removeStop = (id: number) => {
@@ -348,6 +357,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         updateStop,
         commitStop,
         addStop,
+        insertStop,
         removeStop,
         moveStop,
         selectPalettePoint,
