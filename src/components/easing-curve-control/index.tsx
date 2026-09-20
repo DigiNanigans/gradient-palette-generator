@@ -1,7 +1,7 @@
 import type { TargetedPointerEvent } from "preact";
 import { useRef } from "preact/hooks";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
-import { createGradientPositionMapper, LINEAR_EASING_CURVE, type CubicBezierCurve } from "~/lib/colors";
+import { createGradientPositionMapper, getPaletteSourcePositions, LINEAR_EASING_CURVE, type CubicBezierCurve } from "~/lib/colors";
 import { classes, st } from "./style.st.css";
 
 type Handle = 1 | 2;
@@ -15,7 +15,7 @@ const GRAPH_HEIGHT = 90;
 
 const EasingCurveControl = () => {
 
-    const { easing, snapToSourceColors, stepCount, stops, setEasing, setSnapToSourceColors } = useGradientGenerator();
+    const { easing, snapToSourceColors, stepCount, stops, space, hue, setEasing, setSnapToSourceColors } = useGradientGenerator();
     const graph = useRef<SVGSVGElement>(null);
     const activeHandle = useRef<Handle | null>(null);
 
@@ -49,8 +49,8 @@ const EasingCurveControl = () => {
     const isAltered = (Object.keys(LINEAR_EASING_CURVE) as Coordinate[]).some((coordinate) => curve[coordinate] !== LINEAR_EASING_CURVE[coordinate]);
     const canSnapSources = stops.value.length > 2;
     const showBestFit = canSnapSources && snapToSourceColors.value;
-    
-    const getBestFitPosition = showBestFit ? createGradientPositionMapper(stops.value.length, stepCount.value, curve, true): undefined;
+    const sourcePositions = getPaletteSourcePositions(stops.value.map(({ color }) => color), space.value, hue.value);
+    const getBestFitPosition = showBestFit ? createGradientPositionMapper(sourcePositions, stepCount.value, curve, true) : undefined;
     
     let bestFitPath = "";
     if(getBestFitPosition) {
@@ -134,7 +134,7 @@ const EasingCurveControl = () => {
                 <div>
                     <span class={classes.label}>Easing curve</span>
                     <p class={classes.description}>
-                        Drag the handles to shape interpolation within each colour transition.
+                        Drag the handles to shape colour distribution easing.
                     </p>
                 </div>
             </div>

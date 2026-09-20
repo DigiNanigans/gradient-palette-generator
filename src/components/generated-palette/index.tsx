@@ -3,22 +3,24 @@ import SectionHeading from "~/components/section-heading";
 import { classes } from "./style.st.css";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import PaletteTexturePreview from "../palette-texture-preview";
-import { getGeneratedIndexForSource } from "~/lib/colors";
+import { getPaletteSourcePositions, getSnappedGeneratedIndexes } from "~/lib/colors";
 
 const GeneratedPalette = () => {
 
-    const { colors, stops, selectedPalettePoint } = useGradientGenerator();
+    const { colors, stops, stepCount, space, hue, easing, snapToSourceColors, selectedPalettePoint } = useGradientGenerator();
     const selection = selectedPalettePoint.value;
     let selectedIndex: number | undefined;
 
     if (selection?.kind === "generated") {
         selectedIndex = selection.index;
-    } else if (selection?.kind === "source") {
-        selectedIndex = getGeneratedIndexForSource(
-            colors.value,
-            stops.value.map(({ color }) => ({ hex: color })),
-            selection.index,
-        )
+    } else if (selection?.kind === "source" && snapToSourceColors.value) {
+        const sourcePositions = getPaletteSourcePositions(
+            stops.value.map(({ color }) => color),
+            space.value,
+            hue.value,
+        );
+        
+        selectedIndex = getSnappedGeneratedIndexes(sourcePositions, stepCount.value, easing.value).get(selection.index);
     }
 
     return (

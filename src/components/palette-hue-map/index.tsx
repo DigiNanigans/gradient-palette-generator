@@ -1,7 +1,7 @@
 import { batch, useSignal } from "@preact/signals";
 import type { TargetedPointerEvent } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { describeColor, getGeneratedIndexForSource, getSourceIndexForGenerated, type ColorDetails } from "~/lib/colors";
+import { describeColor, getPaletteSourcePositions, getSnappedGeneratedIndexes, type ColorDetails } from "~/lib/colors";
 import { useGradientGenerator } from "~/hooks/use-gradient-generator";
 import { classes, st } from "./style.st.css";
 import LightnessChart from "./lightness-chart";
@@ -15,6 +15,7 @@ const MAX_FIELD_PIXEL_RATIO = 2;
 const UPDATE_THROTTLE_MS = 80;
 const RESIZE_SETTLE_MS = 120;
 const DRAG_START_THRESHOLD = 3;
+const POINT_TRANSITION_MS = 160;
 
 type DragViewport = {
     hueStart: number;
@@ -125,6 +126,8 @@ const PaletteHueMap = (props: {
     const dragGesture = useRef<DragGesture | undefined>(undefined);
     const dragPointerDirty = useRef(false);
     const draggedGeneratedIndex = useRef<number | undefined>(undefined);
+    const settlingGeneratedIndex = useSignal<number>();
+    const settleGeneratedTimer = useRef<number | undefined>(undefined);
     const normalViewportRef = useRef<DragViewport | undefined>(undefined);
     const dragFrame = useRef<number | undefined>(undefined);
     const cropResetFrame = useRef<number | undefined>(undefined);
@@ -163,6 +166,7 @@ const PaletteHueMap = (props: {
 
     useEffect(() => () => {
         if (updateTimer.current !== undefined) window.clearTimeout(updateTimer.current);
+        if (settleGeneratedTimer.current !== undefined) window.clearTimeout(settleGeneratedTimer.current);
         if (dragFrame.current !== undefined) window.cancelAnimationFrame(dragFrame.current);
         if (cropResetFrame.current !== undefined) window.cancelAnimationFrame(cropResetFrame.current);
     }, []);
@@ -181,6 +185,23 @@ const PaletteHueMap = (props: {
 
     const mapColors = throttledData.value.colors;
     const mapSourceColors = throttledData.value.sourceColors;
+
+    const snappedGeneratedIndexes = ctx.snapToSourceColors.value
+        ? getSnappedGeneratedIndexes(
+            getPaletteSourcePositions(
+                mapSourceColors.map(({ hex }) => hex),
+                ctx.space.value,
+                ctx.hue.value,
+            ),
+            ctx.stepCount.value,
+            ctx.easing.value,
+        )
+        : new Map<number, number>();
+
+    const snappedSourceIndexes = new Map(
+        [...snappedGeneratedIndexes].map(([sourceIndex, generatedIndex]) => [generatedIndex, sourceIndex]),
+    );
+
     const allColors = [...mapColors, ...mapSourceColors];
     const normalHueWindow = getHueWindow(allColors);
     const normalSaturationWindow = getSaturationWindow(allColors);
@@ -398,6 +419,33 @@ const PaletteHueMap = (props: {
             });
         }
 
+        let nextGeneratedIndex: number | undefined;
+        if (ctx.snapToSourceColors.peek()) {
+            const currentSourcePositions = getPaletteSourcePositions(
+                ctx.stops.peek().map(({ color: stopColor }) => stopColor),
+                ctx.space.peek(),
+                ctx.hue.peek(),
+            );
+
+            nextGeneratedIndex = getSnappedGeneratedIndexes(
+                currentSourcePositions,
+                ctx.stepCount.peek(),
+                ctx.easing.peek(),
+            ).get(index);
+        }
+
+        if (nextGeneratedIndex !== draggedGeneratedIndex.current) {
+            draggedGeneratedIndex.current = nextGeneratedIndex;
+            if (settleGeneratedTimer.current !== undefined) window.clearTimeout(settleGeneratedTimer.current);
+            settlingGeneratedIndex.value = nextGeneratedIndex;
+            settleGeneratedTimer.current = nextGeneratedIndex === undefined
+                ? undefined
+                : window.setTimeout(() => {
+                    settlingGeneratedIndex.value = undefined;
+                    settleGeneratedTimer.current = undefined;
+                }, POINT_TRANSITION_MS);
+        }
+
         draggedHue.current = hue;
         updateNodeTransforms(viewport, index, color, { x, y });
     };
@@ -444,7 +492,7 @@ const PaletteHueMap = (props: {
         const markerBounds = event.currentTarget.getBoundingClientRect();
 
         draggedSource.current = index;
-        draggedGeneratedIndex.current = getGeneratedIndexForSource(props.colors, props.sourceColors, index);
+        draggedGeneratedIndex.current = snappedGeneratedIndexes.get(index);
         draggedSourceLightness.current = props.sourceColors[index]?.lightness ?? 50;
         draggedHue.current = props.sourceColors[index]?.hue;
         adjacentHues.current = [index - 1, index + 1]
@@ -489,6 +537,9 @@ const PaletteHueMap = (props: {
 
         draggedSource.current = undefined;
         draggedGeneratedIndex.current = undefined;
+        settlingGeneratedIndex.value = undefined;
+        if (settleGeneratedTimer.current !== undefined) window.clearTimeout(settleGeneratedTimer.current);
+        settleGeneratedTimer.current = undefined;
         draggedSourceLightness.current = undefined;
         draggedHue.current = undefined;
         adjacentHues.current = [];
@@ -546,7 +597,7 @@ const PaletteHueMap = (props: {
                             
                             const isSelected = selection?.kind === "source"
                                 ? selection.index === index
-                                : selection?.kind === "generated" && getSourceIndexForGenerated(mapColors, mapSourceColors, selection.index) === index;
+                                : selection?.kind === "generated" && snappedSourceIndexes.get(selection.index) === index;
                             
                             const transform = isDragging
                                 ? directTransforms.current.source[index] ?? `translate(${position.x} ${position.y})`
@@ -584,12 +635,12 @@ const PaletteHueMap = (props: {
                             const position = getPosition(color);
                             const isDragged = isDragging && draggedGeneratedIndex.current === index;
                             const selectedGeneratedIndex = selection?.kind === "source"
-                                ? getGeneratedIndexForSource(mapColors, mapSourceColors, selection.index)
+                                ? snappedGeneratedIndexes.get(selection.index)
                                 : selection?.kind === "generated"
                                     ? selection.index
                                     : undefined;
                             const isSelected = selectedGeneratedIndex === index;
-                            const sourceIndex = getSourceIndexForGenerated(mapColors, mapSourceColors, index);
+                            const sourceIndex = snappedSourceIndexes.get(index);
                             const transform = isDragging
                                 ? directTransforms.current.generated[index] ?? `translate(${position.x} ${position.y})`
                                 : `translate(${position.x} ${position.y})`;
@@ -600,7 +651,7 @@ const PaletteHueMap = (props: {
                                         generatedNodes.current[index] = element;
                                     }}
                                     class={st(classes.point, {
-                                        animated: pointsReady.value && !isResizing.value && !isDragged,
+                                        animated: pointsReady.value && !isResizing.value && (!isDragged || settlingGeneratedIndex.value === index),
                                         selected: isSelected,
                                         shared: sourceIndex !== undefined,
                                     })}

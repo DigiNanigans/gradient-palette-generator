@@ -12,39 +12,6 @@ export type ColorDetails = {
     lightness: number;
 };
 
-export const getGeneratedIndexForSource = (colors: ReadonlyArray<Pick<ColorDetails, "hex">>, sourceColors: ReadonlyArray<Pick<ColorDetails, "hex">>, sourceIndex: number) => {
-    if (sourceIndex === 0) return colors.length > 0 ? 0 : undefined;
-    if (sourceIndex === sourceColors.length - 1) return colors.length > 0 ? colors.length - 1 : undefined;
-
-    const source = sourceColors[sourceIndex];
-    if (!source) return undefined;
-
-    const expectedIndex = (sourceIndex / Math.max(sourceColors.length - 1, 1))
-        * Math.max(colors.length - 1, 0);
-    let closestIndex: number | undefined;
-
-    colors.forEach((color, index) => {
-        if (color.hex !== source.hex) return;
-        if (
-            closestIndex === undefined
-            || Math.abs(index - expectedIndex) < Math.abs(closestIndex - expectedIndex)
-        ) closestIndex = index;
-    });
-
-    return closestIndex;
-};
-
-export const getSourceIndexForGenerated = (colors: ReadonlyArray<Pick<ColorDetails, "hex">>, sourceColors: ReadonlyArray<Pick<ColorDetails, "hex">>, generatedIndex: number) => {
-    let matchingSource: number | undefined;
-
-    sourceColors.forEach((_, sourceIndex) => {
-        if (getGeneratedIndexForSource(colors, sourceColors, sourceIndex) !== generatedIndex) return;
-        matchingSource ??= sourceIndex;
-    });
-
-    return matchingSource;
-};
-
 export type ContrastMode = "light" | "dark";
 export type CubicBezierCurve = { x1: number; y1: number; x2: number; y2: number };
 
@@ -115,108 +82,162 @@ export const getContrastMode = (
     return lightContrast >= darkContrast ? "light" : "dark";
 };
 
-type CurvePoint = { x: number; y: number };
+const getSourceSnapIndexes = (sourcePositions: number[], positions: number[]) => {
+    const sourceCount = sourcePositions.length;
+    if (sourceCount < 2 || positions.length < sourceCount) return new Map<number, number>();
 
-const createMonotoneCurve = (points: CurvePoint[]) => {
-    const widths = points.slice(0, -1).map((point, index) => points[index + 1].x - point.x);
-    const slopes = widths.map((width, index) => (points[index + 1].y - points[index].y) / width);
-    const tangents = points.map((_, index) => {
-        if (index === 0) return slopes[0];
-        if (index === points.length - 1) return slopes[slopes.length - 1];
-        return (slopes[index - 1] + slopes[index]) / 2;
-    });
+    const assignments = new Map<number, number>([
+        [0, 0],
+        [positions.length - 1, sourceCount - 1],
+    ]);
 
-    slopes.forEach((slope, index) => {
-        if (slope === 0) {
-            tangents[index] = 0;
-            tangents[index + 1] = 0;
-            return;
+    const interiorSourceCount = sourceCount - 2;
+    if (interiorSourceCount === 0) return assignments;
+
+    const costs = Array.from({ length: interiorSourceCount }, () => Array(positions.length).fill(Number.POSITIVE_INFINITY));
+    const parents = Array.from({ length: interiorSourceCount }, () => Array(positions.length).fill(-1));
+
+    for (let sourceOffset = 0; sourceOffset < interiorSourceCount; sourceOffset += 1) {
+        const sourceIndex = sourceOffset + 1;
+        const sourcePosition = sourcePositions[sourceIndex];
+        const firstStep = sourceIndex;
+        const lastStep = positions.length - sourceCount + sourceIndex;
+
+        for (let stepIndex = firstStep; stepIndex <= lastStep; stepIndex += 1) {
+            const distance = Math.abs(positions[stepIndex] - sourcePosition);
+
+            if (sourceOffset === 0) {
+                costs[sourceOffset][stepIndex] = distance;
+                continue;
+            }
+
+            for (let previousStep = sourceOffset; previousStep < stepIndex; previousStep += 1) {
+                const cost = costs[sourceOffset - 1][previousStep] + distance;
+                if (cost < costs[sourceOffset][stepIndex]) {
+                    costs[sourceOffset][stepIndex] = cost;
+                    parents[sourceOffset][stepIndex] = previousStep;
+                }
+            }
         }
+    }
 
-        const startRatio = tangents[index] / slope;
-        const endRatio = tangents[index + 1] / slope;
-        const magnitude = Math.hypot(startRatio, endRatio);
+    const finalOffset = interiorSourceCount - 1;
+    let stepIndex = costs[finalOffset].reduce((bestStep, cost, index) => (
+        cost < costs[finalOffset][bestStep] ? index : bestStep
+    ), 0);
 
-        if (magnitude > 3) {
-            const scale = 3 / magnitude;
-            tangents[index] = scale * startRatio * slope;
-            tangents[index + 1] = scale * endRatio * slope;
-        }
-    });
+    for (let sourceOffset = finalOffset; sourceOffset >= 0; sourceOffset -= 1) {
+        assignments.set(stepIndex, sourceOffset + 1);
+        stepIndex = parents[sourceOffset][stepIndex];
+    }
 
-    return (value: number) => {
-        const position = clamp(value, 0, 1);
-        const upperIndex = points.findIndex((point) => point.x >= position);
-        if (upperIndex <= 0) return points[0].y;
+    return assignments;
+};
 
-        const lowerIndex = upperIndex - 1;
-        const width = widths[lowerIndex];
-        const localPosition = width === 0 ? 0 : (position - points[lowerIndex].x) / width;
-        const squared = localPosition * localPosition;
-        const cubed = squared * localPosition;
-        const startBasis = (2 * cubed) - (3 * squared) + 1;
-        const startTangentBasis = cubed - (2 * squared) + localPosition;
-        const endBasis = (-2 * cubed) + (3 * squared);
-        const endTangentBasis = cubed - squared;
-
-        return clamp(
-            (startBasis * points[lowerIndex].y)
-            + (startTangentBasis * width * tangents[lowerIndex])
-            + (endBasis * points[upperIndex].y)
-            + (endTangentBasis * width * tangents[upperIndex]),
-            0,
-            1,
-        );
-    };
+export const getSnappedGeneratedIndexes = (
+    sourcePositions: number[],
+    steps: number,
+    easing: CubicBezierCurve,
+) => {
+    const generatedPositions = Array.from({ length: steps }, (_, index) => (
+        applyCubicBezier(index / Math.max(steps - 1, 1), easing)
+    ));
+    const generatedToSource = getSourceSnapIndexes(sourcePositions, generatedPositions);
+    return new Map([...generatedToSource].map(([generatedIndex, sourceIndex]) => [sourceIndex, generatedIndex]));
 };
 
 export const createGradientPositionMapper = (
-    sourceCount: number,
+    sourcePositions: number[],
     steps: number,
     easing: CubicBezierCurve,
     snapToSourceColors = false,
 ) => {
-    const rangeCount = Math.max(sourceCount - 1, 1);
-    const getAuthoredPosition = (progress: number) => {
-        const position = clamp(progress, 0, 1) * rangeCount;
-        const rangeIndex = Math.min(Math.floor(position), rangeCount - 1);
-        const localPosition = Math.min(position - rangeIndex, 1);
-        return (rangeIndex + applyCubicBezier(localPosition, easing)) / rangeCount;
+    const sourceCount = sourcePositions.length;
+    const getAuthoredPosition = (progress: number) => applyCubicBezier(progress, easing);
+    if (!snapToSourceColors || sourceCount <= 2 || steps < sourceCount) return getAuthoredPosition;
+
+    const authoredPositions = Array.from({ length: steps }, (_, index) => (
+        getAuthoredPosition(index / Math.max(steps - 1, 1))
+    ));
+    
+    const snapIndexes = getSourceSnapIndexes(sourcePositions, authoredPositions);
+    const corrections = [...snapIndexes.entries()]
+        .map(([stepIndex, sourceIndex]) => {
+            const progress = stepIndex / Math.max(steps - 1, 1);
+            const target = sourcePositions[sourceIndex];
+            return {
+                progress,
+                target,
+                offset: target - authoredPositions[stepIndex],
+            };
+        })
+        .sort((a, b) => a.progress - b.progress);
+
+    return (progress: number) => {
+        const position = clamp(progress, 0, 1);
+        const upperIndex = corrections.findIndex((point) => point.progress >= position);
+        if (upperIndex <= 0) return clamp(getAuthoredPosition(position) + corrections[0].offset, 0, 1);
+        if (corrections[upperIndex].progress === position) return corrections[upperIndex].target;
+
+        const lower = corrections[upperIndex - 1];
+        const upper = corrections[upperIndex];
+        const width = upper.progress - lower.progress;
+        const localPosition = width === 0 ? 0 : (position - lower.progress) / width;
+        const smoothPosition = localPosition * localPosition * (3 - (2 * localPosition));
+        const offset = lower.offset + ((upper.offset - lower.offset) * smoothPosition);
+
+        return clamp(getAuthoredPosition(position) + offset, 0, 1);
     };
+};
 
-    if (!snapToSourceColors || sourceCount <= 2 || steps < sourceCount) {
-        return getAuthoredPosition;
-    }
+const PATH_LENGTH_SAMPLES = 12;
 
-    const fitPoints: CurvePoint[] = [{ x: 0, y: 0 }];
-    let previousStep = 0;
+const createColorRanges = (sourceColors: string[], space: InterpolationSpace, hue: HueMethod) => (
+    sourceColors.slice(0, -1).map((color, index) => new Color(color).range(
+        new Color(sourceColors[index + 1]),
+        { space, hue, outputSpace: "srgb" },
+    ))
+);
 
-    for (let sourceIndex = 1; sourceIndex < sourceCount - 1; sourceIndex += 1) {
-        const expectedPosition = sourceIndex / rangeCount;
-        const lastAvailableStep = steps - sourceCount + sourceIndex;
-        let nearestStep = previousStep + 1;
-        let nearestPosition = getAuthoredPosition(nearestStep / (steps - 1));
-        let nearestDistance = Math.abs(nearestPosition - expectedPosition);
+const getRangeMetrics = (ranges: Array<(progress: number) => Color>) => (
+    ranges.map((range) => {
+        let length = 0;
+        let previous = range(0);
+        const distances = [0];
 
-        for (let stepIndex = previousStep + 2; stepIndex <= lastAvailableStep; stepIndex += 1) {
-            const stepPosition = getAuthoredPosition(stepIndex / (steps - 1));
-            const distance = Math.abs(stepPosition - expectedPosition);
-
-            if (distance < nearestDistance) {
-                nearestStep = stepIndex;
-                nearestPosition = stepPosition;
-                nearestDistance = distance;
-            }
+        for (let sample = 1; sample <= PATH_LENGTH_SAMPLES; sample += 1) {
+            const color = range(sample / PATH_LENGTH_SAMPLES);
+            length += Color.deltaEOK(previous, color);
+            distances.push(length);
+            previous = color;
         }
 
-        fitPoints.push({ x: nearestPosition, y: expectedPosition });
-        previousStep = nearestStep;
+        return { length, distances };
+    })
+);
+
+const getSourcePositionsForMetrics = (metrics: Array<{ length: number }>) => {
+    const totalLength = metrics.reduce((sum, metric) => sum + metric.length, 0);
+
+    if (totalLength <= Number.EPSILON) {
+        return Array.from({ length: metrics.length + 1 }, (_, index) => index / Math.max(metrics.length, 1));
     }
 
-    fitPoints.push({ x: 1, y: 1 });
-    const applyBestFit = createMonotoneCurve(fitPoints);
-    return (progress: number) => applyBestFit(getAuthoredPosition(progress));
+    const positions = [0];
+    let distance = 0;
+    metrics.forEach((metric) => {
+        distance += metric.length;
+        positions.push(distance / totalLength);
+    });
+    positions[positions.length - 1] = 1;
+    return positions;
 };
+
+export const getPaletteSourcePositions = (
+    sourceColors: string[],
+    space: InterpolationSpace,
+    hue: HueMethod,
+) => getSourcePositionsForMetrics(getRangeMetrics(createColorRanges(sourceColors, space, hue)));
 
 export const createPalette = (
     sourceColors: string[],
@@ -227,21 +248,39 @@ export const createPalette = (
     snapToSourceColors = false,
 ) => {
     if (sourceColors.length < 2) return sourceColors.map((color) => new Color(color));
-    const ranges = sourceColors.slice(0, -1).map((color, index) => new Color(color).range(
-        new Color(sourceColors[index + 1]),
-        { space, hue, outputSpace: "srgb" },
-    ));
+    const ranges = createColorRanges(sourceColors, space, hue);
+    const rangeMetrics = getRangeMetrics(ranges);
+    const sourcePositions = getSourcePositionsForMetrics(rangeMetrics);
     const getGradientPosition = createGradientPositionMapper(
-        sourceColors.length,
+        sourcePositions,
         steps,
         easing,
         snapToSourceColors,
     );
+    const positions = Array.from({ length: steps }, (_, index) => (
+        getGradientPosition(index / Math.max(steps - 1, 1))
+    ));
 
-    return Array.from({ length: steps }, (_, index) => {
-        const position = getGradientPosition(index / Math.max(steps - 1, 1)) * ranges.length;
-        const rangeIndex = Math.min(Math.floor(position), ranges.length - 1);
-        const localPosition = Math.min(position - rangeIndex, 1);
+    return positions.map((gradientPosition) => {
+        const rangeIndex = Math.max(0, Math.min(
+            sourcePositions.findIndex((position, index) => index > 0 && gradientPosition <= position) - 1,
+            ranges.length - 1,
+        ));
+        const rangeStart = sourcePositions[rangeIndex];
+        const rangeEnd = sourcePositions[rangeIndex + 1];
+        const localDistanceProgress = rangeEnd === rangeStart
+            ? 0
+            : clamp((gradientPosition - rangeStart) / (rangeEnd - rangeStart), 0, 1);
+        const metric = rangeMetrics[rangeIndex];
+        const targetDistance = localDistanceProgress * metric.length;
+        const matchingSample = metric.distances.findIndex((distance) => distance >= targetDistance);
+        const upperSample = Math.max(1, matchingSample === -1 ? PATH_LENGTH_SAMPLES : matchingSample);
+        const lowerDistance = metric.distances[upperSample - 1];
+        const upperDistance = metric.distances[upperSample];
+        const sampleProgress = upperDistance === lowerDistance
+            ? 0
+            : (targetDistance - lowerDistance) / (upperDistance - lowerDistance);
+        const localPosition = ((upperSample - 1) + sampleProgress) / PATH_LENGTH_SAMPLES;
         return ranges[rangeIndex](localPosition).toGamut("srgb").to("srgb");
     });
 };
