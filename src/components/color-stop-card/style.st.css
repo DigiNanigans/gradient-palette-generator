@@ -1,7 +1,7 @@
 @st-import [monoFont, pageBg, panelBg, panelBorder, uiFgColor, uiFgDark, uiMutedColor, accentColor, fontMono, borderRadius] from "../../project.st.css";
 
 .root {
-    -st-states: mode(enum(light, dark)), selected;
+    -st-states: mode(enum(light, dark)), selected, hovered;
 
     min-width: 0;
     padding: 0.6rem;
@@ -10,7 +10,8 @@
     background: value(panelBg);
     transition: transform 60ms ease;
 
-    &:hover {
+    &:hover,
+    &:hovered {
         border-color: value(uiMutedColor);
         transition: none;
     }

@@ -634,6 +634,37 @@ const PaletteHueMap = (props: {
     };
 
     const selection = ctx.selectedPalettePoint.value;
+    const hover = ctx.hoveredPalettePoint.value;
+    
+    let hoveredSourceIndex: number | undefined;
+    let hoveredGeneratedIndex: number | undefined;
+
+    if (hover?.kind === "source") {
+        hoveredSourceIndex = hover.index;
+        hoveredGeneratedIndex = snappedGeneratedIndexes.get(hover.index);
+    } else if (hover?.kind === "generated") {
+        hoveredGeneratedIndex = hover.index;
+        hoveredSourceIndex = snappedSourceIndexes.get(hover.index);
+    }
+
+    const hoverGeneratedPoint = (generatedIndex: number, sourceIndex?: number) => {
+        if (sourceIndex !== undefined) {
+            ctx.hoverPalettePoint({ kind: "source", index: sourceIndex });
+            return;
+        }
+
+        ctx.hoverPalettePoint({ kind: "generated", index: generatedIndex });
+    };
+
+    const hoverSourcePoint = (index?: number) => {
+        if (index === undefined) {
+            ctx.hoverPalettePoint(undefined);
+            return;
+        }
+
+        ctx.hoverPalettePoint({ kind: "source", index });
+    };
+
     const updateSourceLightness = (index: number, lightness: number) => {
         const color = props.sourceColors[index];
         const stop = ctx.stops.value[index];
@@ -740,6 +771,7 @@ const PaletteHueMap = (props: {
                                         animated: pointsReady.value && !isResizing.value && !isDragged && !suppressPointTransitions.value,
                                         selected: isSelected,
                                         dragging: isDragged,
+                                        hovered: hoveredSourceIndex === index,
                                     }, classes.sourceMarker)}
                                     transform={transform}
                                     key={`source-${stopId ?? index}`}
@@ -768,6 +800,8 @@ const PaletteHueMap = (props: {
                                     onPointerMove={(event) => moveSourceDrag(event, index)}
                                     onPointerUp={(event) => finishSourceDrag(event, index)}
                                     onPointerCancel={(event) => finishSourceDrag(event, index)}
+                                    onPointerEnter={() => hoverSourcePoint(index)}
+                                    onPointerLeave={() => hoverSourcePoint()}
                                 >
                                     <circle class={classes.sourceMarkerHitTarget} cx="0" cy="0" r={SOURCE_MARKER_RADIUS} />
                                     <line class={classes.sourceMarkerOutline} x1={-SOURCE_MARKER_RADIUS} y1="0" x2={SOURCE_MARKER_RADIUS} y2="0" />
@@ -810,6 +844,7 @@ const PaletteHueMap = (props: {
                                         animated: pointsReady.value && !isResizing.value && !suppressPointTransitions.value && (!isDragged || settlingGeneratedIndex.value === index),
                                         selected: isSelected,
                                         shared: sourceIndex !== undefined,
+                                        hovered: hoveredGeneratedIndex === index,
                                     })}
                                     transform={transform}
                                     key={index}
@@ -817,6 +852,8 @@ const PaletteHueMap = (props: {
                                     onClick={() => ctx.selectPalettePoint(sourceIndex === undefined
                                         ? { kind: "generated", index }
                                         : { kind: "source", index: sourceIndex })}
+                                    onPointerEnter={() => hoverGeneratedPoint(index, sourceIndex)}
+                                    onPointerLeave={() => ctx.hoverPalettePoint(undefined)}
                                     onDblClick={(event) => {
                                         event.stopPropagation();
                                         insertSourceColor(color, true);
@@ -833,8 +870,10 @@ const PaletteHueMap = (props: {
                 <LightnessChart
                     colors={props.sourceColors}
                     selectedIndex={selection?.kind === "source" ? selection.index : undefined}
+                    hoveredIndex={hoveredSourceIndex}
                     focusedIndex={focusedSource.value}
                     onSelect={(index) => ctx.selectPalettePoint({ kind: "source", index })}
+                    onHoveredIndexChange={hoverSourcePoint}
                     onFocusedIndexChange={(index) => focusedSource.value = index}
                     onLightnessChange={updateSourceLightness}
                 />

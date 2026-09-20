@@ -39,6 +39,7 @@ type GradientGenContextValue = {
     colors: ReadonlySignal<ColorDetails[]>;
     preview: ReadonlySignal<string>;
     selectedPalettePoint: ReadonlySignal<PalettePointSelection | undefined>;
+    hoveredPalettePoint: ReadonlySignal<PalettePointSelection | undefined>;
     setStepCount: (value: number) => void;
     setSpace: (value: InterpolationSpace) => void;
     setHue: (value: HueMethod) => void;
@@ -51,6 +52,7 @@ type GradientGenContextValue = {
     removeStop: (id: number) => void;
     moveStop: (index: number, direction: 1 | -1) => void;
     selectPalettePoint: (selection: PalettePointSelection | undefined) => void;
+    hoverPalettePoint: (selection: PalettePointSelection | undefined) => void;
     beginHistoryTransaction: () => void;
     endHistoryTransaction: () => void;
     getShareUrl: () => string;
@@ -73,6 +75,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const easing = useSignal<CubicBezierCurve>({ ...initialConfiguration.easing });
     const snapToSourceColors = useSignal(initialConfiguration.snapToSourceColors);
     const selectedPalettePoint = useSignal<PalettePointSelection>();
+    const hoveredPalettePoint = useSignal<PalettePointSelection>();
     const undoHistory = useRef<PaletteConfiguration[]>([]);
     const redoHistory = useRef<PaletteConfiguration[]>([]);
     const activePointers = useRef(new Set<number>());
@@ -130,6 +133,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
     const setHue = (value: HueMethod) => mutateConfiguration(() => hue.value = value);
     const setSnapToSourceColors = (value: boolean) => mutateConfiguration(() => snapToSourceColors.value = value);
     const selectPalettePoint = (selection: PalettePointSelection | undefined) => selectedPalettePoint.value = selection;
+    const hoverPalettePoint = (selection: PalettePointSelection | undefined) => hoveredPalettePoint.value = selection;
 
     const setEasing = (value: CubicBezierCurve) => mutateConfiguration(() => {
         easing.value = {
@@ -214,6 +218,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
             easing.value = { ...configuration.easing };
             snapToSourceColors.value = configuration.snapToSourceColors;
             selectedPalettePoint.value = undefined;
+            hoveredPalettePoint.value = undefined;
         });
 
         nextId.current = configuration.colors.length;
@@ -349,6 +354,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         colors,
         preview,
         selectedPalettePoint,
+        hoveredPalettePoint,
         setStepCount,
         setSpace,
         setHue,
@@ -361,6 +367,7 @@ export const GradientGenProvider: FunctionComponent = (props) => {
         removeStop,
         moveStop,
         selectPalettePoint,
+        hoverPalettePoint,
         beginHistoryTransaction,
         endHistoryTransaction,
         getShareUrl,

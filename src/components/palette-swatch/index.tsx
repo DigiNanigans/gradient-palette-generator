@@ -6,6 +6,8 @@ const PaletteSwatch = (props: {
     color: ColorDetails;
     sourceIndex?: number;
     selected?: boolean;
+    hovered?: boolean;
+    onHoverChange?: (hovered: boolean) => void;
 }) => {
 
     const { notify } = useToast();
@@ -22,9 +24,11 @@ const PaletteSwatch = (props: {
 
     return (
         <button
-            class={st(classes.root, { selected: props.selected, mode: indexMode })}
+            class={st(classes.root, { selected: props.selected, hovered: props.hovered, mode: indexMode })}
             type="button"
             onClick={copyColor}
+            onPointerEnter={() => props.onHoverChange?.(true)}
+            onPointerLeave={() => props.onHoverChange?.(false)}
             title={`Copy ${props.color.hex}`}
             style={{ [vars.swatchColor]: props.color.hex }}
         >

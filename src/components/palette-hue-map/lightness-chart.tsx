@@ -10,8 +10,10 @@ const DRAG_START_THRESHOLD = 3;
 const LightnessChart = (props: {
     colors: ColorDetails[];
     selectedIndex?: number;
+    hoveredIndex?: number;
     focusedIndex?: number;
     onSelect: (index: number) => void;
+    onHoveredIndexChange: (index: number | undefined) => void;
     onFocusedIndexChange: (index: number | undefined) => void;
     onLightnessChange: (index: number, lightness: number) => void;
 }) => {
@@ -82,16 +84,19 @@ const LightnessChart = (props: {
             <div ref={track} class={classes.lightnessTrack}>
                 {props.colors.map((color, index) => {
                     const selected = props.selectedIndex === index;
+                    const hovered = props.hoveredIndex === index;
                     const dragging = draggingIndex.value === index;
 
                     return (
-                        <span class={st(classes.lightnessIndicator, { selected, dragging })} data-palette-point="source-lightness"
+                        <span class={st(classes.lightnessIndicator, { selected, hovered, dragging })} data-palette-point="source-lightness"
                             style={{
                                 [vars.lightnessPosition]: `${(100 - color.lightness) / 10}rem`,
                                 [vars.hex]: color.hex,
                             }}
 
                             onBlur={() => props.onFocusedIndexChange(undefined)}
+                            onPointerEnter={() => props.onHoveredIndexChange(index)}
+                            onPointerLeave={() => props.onHoveredIndexChange(undefined)}
                             onPointerDown={(event) => startDragging(event, index)}
                             onPointerMove={(event) => moveDragging(event, index)}
                             onPointerUp={(event) => stopDragging(event, index)}

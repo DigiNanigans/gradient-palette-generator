@@ -16,12 +16,15 @@ const ColorStopCard = (props: {
         moveStop,
         removeStop,
         selectedPalettePoint,
+        hoveredPalettePoint,
         selectPalettePoint,
+        hoverPalettePoint,
         beginHistoryTransaction,
         endHistoryTransaction,
     } = useGradientGenerator();
     const textMode = getContrastMode(props.stop.color);
     const selected = selectedPalettePoint.value?.kind === "source" && selectedPalettePoint.value.index === props.index;
+    const hovered = hoveredPalettePoint.value?.kind === "source" && hoveredPalettePoint.value.index === props.index;
     const pickerTransactionActive = useRef(false);
 
     const beginPickerTransaction = () => {
@@ -38,9 +41,11 @@ const ColorStopCard = (props: {
 
     return (
         <article
-            class={st(classes.root, { mode: textMode, selected })}
+            class={st(classes.root, { mode: textMode, selected, hovered })}
             style={{ [vars.stopColor]: props.stop.color }}
             onClick={() => selectPalettePoint({ kind: "source", index: props.index })}
+            onPointerEnter={() => hoverPalettePoint({ kind: "source", index: props.index })}
+            onPointerLeave={() => hoverPalettePoint(undefined)}
         >
 
             <div class={classes.colorWell}>

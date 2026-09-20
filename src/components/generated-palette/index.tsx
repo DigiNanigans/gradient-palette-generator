@@ -7,8 +7,21 @@ import { getPaletteSourcePositions, getSnappedGeneratedIndexes } from "~/lib/col
 
 const GeneratedPalette = () => {
 
-    const { colors, stops, stepCount, space, hue, easing, snapToSourceColors, selectedPalettePoint } = useGradientGenerator();
+    const {
+        colors,
+        stops,
+        stepCount,
+        space,
+        hue,
+        easing,
+        snapToSourceColors,
+        selectedPalettePoint,
+        hoveredPalettePoint,
+        hoverPalettePoint,
+    } = useGradientGenerator();
+    
     const selection = selectedPalettePoint.value;
+    const hover = hoveredPalettePoint.value;
     let generatedIndexesBySource = new Map<number, number>();
 
     if (snapToSourceColors.value) {
@@ -33,12 +46,33 @@ const GeneratedPalette = () => {
     );
 
     let selectedIndex: number | undefined;
+    let hoveredIndex: number | undefined;
 
     if (selection?.kind === "generated") {
         selectedIndex = selection.index;
     } else if (selection?.kind === "source") {
         selectedIndex = generatedIndexesBySource.get(selection.index);
     }
+
+    if (hover?.kind === "generated") {
+        hoveredIndex = hover.index;
+    } else if (hover?.kind === "source") {
+        hoveredIndex = generatedIndexesBySource.get(hover.index);
+    }
+
+    const handleSwatchHover = (isHovered: boolean, generatedIndex: number, sourceIndex?: number) => {
+        if (!isHovered) {
+            hoverPalettePoint(undefined);
+            return;
+        }
+
+        if (sourceIndex !== undefined) {
+            hoverPalettePoint({ kind: "source", index: sourceIndex });
+            return;
+        }
+
+        hoverPalettePoint({ kind: "generated", index: generatedIndex });
+    };
 
     return (
         <section class={classes.root}>
@@ -48,14 +82,20 @@ const GeneratedPalette = () => {
             <PaletteTexturePreview colors={colors.value} />
 
             <div class={classes.swatchGrid}>
-                {colors.value.map((color, index) => (
-                    <PaletteSwatch
-                        color={color}
-                        sourceIndex={sourceIndexesByGenerated.get(index)}
-                        selected={index === selectedIndex}
-                        key={`${color.hex}-${index}`}
-                    />
-                ))}
+                {colors.value.map((color, index) => {
+                    const sourceIndex = sourceIndexesByGenerated.get(index);
+
+                    return (
+                        <PaletteSwatch
+                            color={color}
+                            sourceIndex={sourceIndex}
+                            selected={index === selectedIndex}
+                            hovered={index === hoveredIndex}
+                            onHoverChange={(isHovered) => handleSwatchHover(isHovered, index, sourceIndex)}
+                            key={`${color.hex}-${index}`}
+                        />
+                    );
+                })}
             </div>
 
         </section>
