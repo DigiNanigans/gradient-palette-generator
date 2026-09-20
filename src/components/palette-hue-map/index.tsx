@@ -37,6 +37,7 @@ type DragGesture = {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeHue = (hue: number) => ((hue % 360) + 360) % 360;
+const isPastHueMethodThreshold = (hue: number, anchorHue: number) => normalizeHue(hue - anchorHue) > 180;
 
 const getPaletteLightness = (colors: ColorDetails[]) => {
     if (colors.length === 0) return 50;
@@ -118,6 +119,8 @@ const PaletteHueMap = (props: {
     const updateTimer = useRef<number | undefined>(undefined);
     const draggedSource = useRef<number | undefined>(undefined);
     const draggedSourceLightness = useRef<number | undefined>(undefined);
+    const draggedHue = useRef<number | undefined>(undefined);
+    const adjacentHues = useRef<number[]>([]);
     const dragPointer = useRef<DragPointer | undefined>(undefined);
     const dragGesture = useRef<DragGesture | undefined>(undefined);
     const dragPointerDirty = useRef(false);
@@ -189,10 +192,14 @@ const PaletteHueMap = (props: {
         return center + ((((normalizeHue(hue) - center) + 540) % 360) - 180);
     };
 
-    const orderedColors = mapColors.filter(({ saturation }) => saturation > 0.5);
-    const normalReverseHueAxis = orderedColors.length > 1
-        && unwrapHueForWindow(orderedColors[0].hue, normalHueWindow.center)
-            > unwrapHueForWindow(orderedColors[orderedColors.length - 1].hue, normalHueWindow.center);
+    const orderedSourceColors = mapSourceColors.filter(({ saturation }) => saturation > 0.5);
+    const firstSourceHue = orderedSourceColors[0]?.hue;
+    const lastSourceHue = orderedSourceColors[orderedSourceColors.length - 1]?.hue;
+    const forwardHueDistance = firstSourceHue === undefined || lastSourceHue === undefined
+        ? 0
+        : normalizeHue(lastSourceHue - firstSourceHue);
+
+    const normalReverseHueAxis = orderedSourceColors.length > 1 && (ctx.hue.value === "shorter" ? forwardHueDistance > 180 : forwardHueDistance <= 180);
 
     normalViewportRef.current = {
         hueStart: normalHueWindow.start,
@@ -303,7 +310,7 @@ const PaletteHueMap = (props: {
             resizeObserver.disconnect();
             if (resizeTimer.current !== undefined) window.clearTimeout(resizeTimer.current);
         };
-        
+
     }, []);
     
     const getPosition = (color: ColorDetails) => {
@@ -349,7 +356,7 @@ const PaletteHueMap = (props: {
     };
 
     const updateDraggedSource = (pointer: DragPointer, index: number) => {
-        
+
         const element = graph.current;
         const source = props.sourceColors[index];
         const stop = ctx.stops.value[index];
@@ -374,8 +381,24 @@ const PaletteHueMap = (props: {
         const saturation = viewport.saturationEnd - (saturationSpan * saturationProgress);
         const lightness = draggedSourceLightness.current ?? source.lightness;
         const color = describeColor(`hsl(${hue} ${saturation}% ${lightness}%)`);
+        const previousHue = draggedHue.current;
 
-        if (stop.color !== color.hex) ctx.updateStop(stop.id, color.hex);
+        const crossedHueMethodThreshold = previousHue !== undefined
+            && adjacentHues.current.some((anchorHue) => (
+                isPastHueMethodThreshold(previousHue, anchorHue)
+                !== isPastHueMethodThreshold(hue, anchorHue)
+            ));
+
+        if (stop.color !== color.hex || crossedHueMethodThreshold) {
+            batch(() => {
+                if (crossedHueMethodThreshold) {
+                    ctx.setHue(ctx.hue.peek() === "shorter" ? "longer" : "shorter");
+                }
+                if (stop.color !== color.hex) ctx.updateStop(stop.id, color.hex);
+            });
+        }
+
+        draggedHue.current = hue;
         updateNodeTransforms(viewport, index, color, { x, y });
     };
 
@@ -423,6 +446,11 @@ const PaletteHueMap = (props: {
         draggedSource.current = index;
         draggedGeneratedIndex.current = getGeneratedIndexForSource(props.colors, props.sourceColors, index);
         draggedSourceLightness.current = props.sourceColors[index]?.lightness ?? 50;
+        draggedHue.current = props.sourceColors[index]?.hue;
+        adjacentHues.current = [index - 1, index + 1]
+            .map((adjacentIndex) => props.sourceColors[adjacentIndex]?.hue)
+            .filter((adjacentHue): adjacentHue is number => adjacentHue !== undefined);
+
         dragPointer.current = { x: event.clientX, y: event.clientY };
         dragGesture.current = {
             origin: dragPointer.current,
@@ -432,6 +460,7 @@ const PaletteHueMap = (props: {
             },
             active: false,
         };
+
         dragPointerDirty.current = false;
         batch(() => {
             dragViewport.value = {
@@ -461,6 +490,8 @@ const PaletteHueMap = (props: {
         draggedSource.current = undefined;
         draggedGeneratedIndex.current = undefined;
         draggedSourceLightness.current = undefined;
+        draggedHue.current = undefined;
+        adjacentHues.current = [];
         dragPointer.current = undefined;
         dragGesture.current = undefined;
         dragPointerDirty.current = false;
