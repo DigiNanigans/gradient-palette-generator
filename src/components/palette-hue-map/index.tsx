@@ -231,8 +231,10 @@ const PaletteHueMap = (props: {
     const mapColors = sourceStructureChanged ? props.colors : throttledData.value.colors;
     const mapSourceColors = sourceStructureChanged ? props.sourceColors : throttledData.value.sourceColors;
 
-    const snappedGeneratedIndexes = ctx.snapToSourceColors.value
-        ? getSnappedGeneratedIndexes(
+    let snappedGeneratedIndexes: Map<number, number>;
+
+    if (ctx.snapToSourceColors.value) {
+        snappedGeneratedIndexes = getSnappedGeneratedIndexes(
             getPaletteSourcePositions(
                 mapSourceColors.map(({ hex }) => hex),
                 ctx.space.value,
@@ -240,8 +242,17 @@ const PaletteHueMap = (props: {
             ),
             ctx.stepCount.value,
             ctx.easing.value,
-        )
-        : new Map<number, number>();
+        );
+    } else {
+        snappedGeneratedIndexes = new Map();
+
+        if (mapSourceColors.length > 0 && mapColors.length > 0) {
+            snappedGeneratedIndexes = new Map([
+                [0, 0],
+                [mapSourceColors.length - 1, mapColors.length - 1],
+            ]);
+        }
+    }
 
     const snappedSourceIndexes = new Map(
         [...snappedGeneratedIndexes].map(([sourceIndex, generatedIndex]) => [generatedIndex, sourceIndex]),
@@ -477,6 +488,10 @@ const PaletteHueMap = (props: {
                 ctx.stepCount.peek(),
                 ctx.easing.peek(),
             ).get(index);
+        } else if (index === 0) {
+            nextGeneratedIndex = 0;
+        } else if (index === ctx.stops.peek().length - 1) {
+            nextGeneratedIndex = ctx.colors.peek().length - 1;
         }
 
         if (nextGeneratedIndex !== draggedGeneratedIndex.current) {

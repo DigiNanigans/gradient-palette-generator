@@ -13,14 +13,18 @@ const GeneratedPalette = () => {
 
     if (selection?.kind === "generated") {
         selectedIndex = selection.index;
-    } else if (selection?.kind === "source" && snapToSourceColors.value) {
-        const sourcePositions = getPaletteSourcePositions(
-            stops.value.map(({ color }) => color),
-            space.value,
-            hue.value,
-        );
-        
-        selectedIndex = getSnappedGeneratedIndexes(sourcePositions, stepCount.value, easing.value).get(selection.index);
+    } else if (selection?.kind === "source") {
+        if (selection.index === 0) selectedIndex = 0;
+        else if (selection.index === stops.value.length - 1) selectedIndex = colors.value.length - 1;
+        else if (snapToSourceColors.value) {
+            const sourcePositions = getPaletteSourcePositions(
+                stops.value.map(({ color }) => color),
+                space.value,
+                hue.value,
+            );
+
+            selectedIndex = getSnappedGeneratedIndexes(sourcePositions, stepCount.value, easing.value).get(selection.index);
+        }
     }
 
     return (
