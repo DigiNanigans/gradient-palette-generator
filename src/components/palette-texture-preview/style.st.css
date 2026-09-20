@@ -21,7 +21,7 @@
 .preview {
     display: block;
     width: 100%;
-    height: clamp(5rem, 10vw, 8rem);
+    height: clamp(3rem, 5vw, 5rem);
     border-radius: value(borderRadius, sm);
     image-rendering: pixelated;
     image-rendering: crisp-edges;
