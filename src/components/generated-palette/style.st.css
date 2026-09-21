@@ -1,7 +1,13 @@
 .swatchGrid {
+    -st-states: addMode;
+
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
     gap: 0.55rem;
+
+    &:addMode {
+        cursor: copy;
+    }
 }
 
 @media (max-width: 42rem) {

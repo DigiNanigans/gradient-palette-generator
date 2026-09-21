@@ -1,8 +1,9 @@
 @st-import [panelBg, panelBorder, uiFgColor, uiFgDark, uiMutedColor, accentColor, fontMono, borderRadius] from "../../project.st.css";
 
 .root {
-    -st-states: selected, hovered, mode(enum(light, dark));
+    -st-states: selected, hovered, addMode, removeMode, insertionBefore, insertionAfter, mode(enum(light, dark));
 
+    position: relative;
     display: flex;
     flex-direction: column;
     border: 1px solid value(panelBorder);
@@ -24,6 +25,37 @@
     &:selected {
         border-color: value(uiMutedColor);
         transform: scale(1.05) translateY(-1px);
+    }
+
+    &:addMode {
+        cursor: copy;
+        pointer-events: none;
+    }
+
+    &:removeMode {
+        cursor: not-allowed;
+    }
+
+    &:insertionBefore::before,
+    &:insertionAfter::after {
+        content: "";
+        position: absolute;
+        top: 0.35rem;
+        bottom: 0.35rem;
+        z-index: 2;
+        width: 2px;
+        border-radius: 999px;
+        background: value(accentColor);
+        box-shadow: 0 0 0 2px color-mix(in srgb, value(accentColor) 18%, transparent);
+        pointer-events: none;
+    }
+
+    &:insertionBefore::before {
+        left: -0.35rem;
+    }
+
+    &:insertionAfter::after {
+        right: -0.35rem;
     }
 }
 
